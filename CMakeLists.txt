@@ -9,14 +9,24 @@ project(computed_torque_controller)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   controller_interface
+  control_toolbox
+  hardware_interface
   pluginlib
   roscpp
+  roslib
   std_msgs
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
+# https://bitbucket.org/osrf/gazebo/issues/2650/catkin-build-cannot-find-tinyxml2-tinyxml2
+unset(TINYXML2_INCLUDE_DIRS CACHE)
+find_package(DART 6.9.2 REQUIRED COMPONENTS 
+  utils-urdf
+  CONFIG
+)
+unset(TINYXML2_INCLUDE_DIRS CACHE)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -104,9 +114,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES computed_torque_controller
-#  CATKIN_DEPENDS controller_interface pluginlib roscpp std_msgs
+  INCLUDE_DIRS include
+  LIBRARIES computed_torque_controller
+  CATKIN_DEPENDS controller_interface control_toolbox hardware_interface pluginlib roscpp roslib std_msgs
 #  DEPENDS system_lib
 )
 
@@ -117,24 +127,33 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
+  ${DART_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/computed_torque_controller.cpp
-# )
+add_library(
+  computed_torque_controller
+  src/computed_torque_controller.cpp
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(
+  computed_torque_controller
+  ${${PROJECT_NAME}_EXPORTED_TARGETS} 
+  ${catkin_EXPORTED_TARGETS}
+)
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/computed_torque_controller_node.cpp)
+add_executable(
+  test_dart 
+  src/test_dart.cpp
+)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -144,12 +163,23 @@ include_directories(
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-# add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(
+  test_dart 
+  ${${PROJECT_NAME}_EXPORTED_TARGETS} 
+  ${catkin_EXPORTED_TARGETS}
+)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(${PROJECT_NAME}_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(
+  computed_torque_controller
+  ${catkin_LIBRARIES}
+  ${DART_LIBRARIES}
+)
+target_link_libraries(
+  test_dart
+  ${catkin_LIBRARIES}
+  ${DART_LIBRARIES}
+)
 
 #############
 ## Install ##
