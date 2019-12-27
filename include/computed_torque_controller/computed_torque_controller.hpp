@@ -21,6 +21,8 @@
 #include <xmlrpcpp/XmlRpcException.h>
 #include <xmlrpcpp/XmlRpcValue.h>
 
+#include <dart/dynamics/FreeJoint.hpp>
+#include <dart/dynamics/Joint.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
 
@@ -87,12 +89,25 @@ public:
       }
     }
 
-    // compose joints information
+    // get model root joint between root link and world, which does not exist in the hardware
+    model_root_joint_ = dynamic_cast< dd::FreeJoint * >(model_->getRootJoint());
+    if (!model_root_joint_) {
+      ROS_ERROR(
+          "ComputedTorqueController::init(): Faild to get a root joint of the dynamics model");
+      return false;
+    }
+
+    // match joint in the dynamics model & hardware (except the model root joint)
     BOOST_FOREACH (dd::Joint *const model_joint, model_->getJoints()) {
+      // skip if the model root joint
+      if (model_joint == model_->getRootJoint()) {
+        continue;
+      }
+      // start composing joint info
       JointInfo joint_info;
       // get the joint in the dynamics model
       joint_info.model_joint = model_joint;
-      // joint state handle
+      // hardware joint state handle
       const std::string joint_name(joint_info.model_joint->getName());
       try {
         joint_info.joint_state_handle = joint_state_iface->getHandle(joint_name);
@@ -111,7 +126,7 @@ public:
                            << joint_ns << "'");
           return false;
         }
-        // joint command handle
+        // hardware joint command handle
         try {
           joint_info.joint_command_handle = joint_command_iface->getHandle(joint_name);
         } catch (const hi::HardwareInterfaceException &ex) {
@@ -137,22 +152,28 @@ public:
   }
 
   virtual void update(const ros::Time &time, const ros::Duration &period) {
-    // TODO: zero the root joint pose
+    // update state of the model
+    // (zero for now. TODO: get model state from ROS message)
+    model_root_joint_->setTransform(Eigen::Isometry3d::Identity());
+    model_root_joint_->setLinearVelocity(Eigen::Vector3d::Zero());
+    model_root_joint_->setAngularVelocity(Eigen::Vector3d::Zero());
+    model_root_joint_->setLinearAcceleration(Eigen::Vector3d::Zero());
+    model_root_joint_->setAngularAcceleration(Eigen::Vector3d::Zero());
 
-    //
-    Eigen::VectorXd u(joints_.size());
-    for (std::size_t i = 0; i < joints_.size(); ++i) {
-      JointInfo &joint(joints_[i]);
-      // update dynamics model by hardware states
+    // update model joints by hardware states
+    BOOST_FOREACH (JointInfo &joint, joints_) {
       joint.model_joint->setPosition(0, joint.joint_state_handle.getPosition());
       joint.model_joint->setVelocity(0, joint.joint_state_handle.getVelocity());
-      // generate control input
-      if (joint.pid) {
-        // TODO: get desired position from command topics
-        u(i) = joint.pid->computeCommand(0. - joint.joint_state_handle.getPosition(), period);
-      } else {
-        u(i) = 0.;
-      }
+    }
+
+    // generate control input
+    Eigen::VectorXd u(joints_.size());
+    for (std::size_t i = 0; i < joints_.size(); ++i) {
+      // TODO: get desired position from command topics
+      const double pos_cmd(0.);
+      u(i) = joints_[i].pid ? joints_[i].pid->computeCommand(
+                                  pos_cmd - joints_[i].joint_state_handle.getPosition(), period)
+                            : 0.;
     }
 
     // compute required torque
@@ -173,6 +194,7 @@ public:
 
 private:
   dart::dynamics::SkeletonPtr model_;
+  dart::dynamics::FreeJoint *model_root_joint_;
   std::vector< JointInfo > joints_;
 };
 } // namespace computed_torque_controller
