@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include <computed_torque_controller/common_namespaces.hpp>
 #include <ros/console.h>
 #include <ros/package.h>
 
@@ -12,7 +13,7 @@ namespace computed_torque_controller {
 
 // Resolver for URIs in URDF files. Currently supports file or package scheme URIs.
 // (ex. "file:/path" or "package://my_robot_description/meshes/body.dae")
-class ROSPackageResourceRetriever : public dart::common::LocalResourceRetriever {
+class ROSPackageResourceRetriever : public dc::LocalResourceRetriever {
 public:
   ROSPackageResourceRetriever() {}
 
@@ -20,20 +21,20 @@ public:
 
   // required interfaces as a ResourceRetriever
 
-  virtual bool exists(const dart::common::Uri &uri) {
-    return dart::common::LocalResourceRetriever::exists(toFileUri(uri));
+  virtual bool exists(const dc::Uri &uri) {
+    return dc::LocalResourceRetriever::exists(toFileUri(uri));
   }
 
-  virtual dart::common::ResourcePtr retrieve(const dart::common::Uri &uri) {
-    return dart::common::LocalResourceRetriever::retrieve(toFileUri(uri));
+  virtual dc::ResourcePtr retrieve(const dc::Uri &uri) {
+    return dc::LocalResourceRetriever::retrieve(toFileUri(uri));
   }
 
-  virtual std::string readAll(const dart::common::Uri &uri) {
-    return dart::common::LocalResourceRetriever::readAll(toFileUri(uri));
+  virtual std::string readAll(const dc::Uri &uri) {
+    return dc::LocalResourceRetriever::readAll(toFileUri(uri));
   }
 
-  virtual std::string getFilePath(const dart::common::Uri &uri) {
-    return dart::common::LocalResourceRetriever::getFilePath(toFileUri(uri));
+  virtual std::string getFilePath(const dc::Uri &uri) {
+    return dc::LocalResourceRetriever::getFilePath(toFileUri(uri));
   }
 
   // helper function
@@ -42,7 +43,7 @@ public:
   //   1. given a valid file URI, returns ifself
   //   2. given a valid package URI, convert it to a file URI by resolving the (ROS) package
   //   3. given any other URI, returns an empty URI
-  static dart::common::Uri toFileUri(const dart::common::Uri &src_uri) {
+  static dc::Uri toFileUri(const dc::Uri &src_uri) {
     // handle the case 3
     if ( // invalid URI
         (!src_uri.mScheme || !src_uri.mPath)
@@ -51,7 +52,7 @@ public:
         // unsupported scheme URI
         || (src_uri.mScheme.get() != "file" && src_uri.mScheme.get() != "package")) {
       ROS_ERROR_STREAM("Invalid or unsupported URI: " << src_uri.toString());
-      return dart::common::Uri();
+      return dc::Uri();
     }
 
     // handle the case 1
@@ -64,11 +65,11 @@ public:
     // handle the case 3; unresolved package name
     if (package_path.empty()) {
       ROS_ERROR_STREAM("Unresolved package name in URI: " << src_uri.toString());
-      return dart::common::Uri();
+      return dc::Uri();
     }
 
     // handle the case 2
-    dart::common::Uri dst_uri;
+    dc::Uri dst_uri;
     dst_uri.mScheme = "file";
     dst_uri.mPath = package_path + src_uri.mPath.get();
     // ROS_INFO_STREAM(src_uri.toString() << " -> " << dst_uri.toString());

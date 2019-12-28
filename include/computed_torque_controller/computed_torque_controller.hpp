@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include <computed_torque_controller/common_namespaces.hpp>
 #include <computed_torque_controller/ros_package_resource_retriever.hpp>
 #include <control_toolbox/pid.h>
 #include <controller_interface/multi_interface_controller.h>
@@ -18,13 +19,13 @@
 #include <ros/node_handle.h>
 #include <ros/param.h>
 #include <ros/time.h>
-#include <xmlrpcpp/XmlRpcException.h>
-#include <xmlrpcpp/XmlRpcValue.h>
 
 #include <dart/dynamics/FreeJoint.hpp>
 #include <dart/dynamics/Joint.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
+
+#include <Eigen/Core>
 
 #include <boost/foreach.hpp>
 #include <boost/optional.hpp>
@@ -32,17 +33,16 @@
 namespace computed_torque_controller {
 
 class ComputedTorqueController
-    : public controller_interface::MultiInterfaceController<
-          hardware_interface::JointStateInterface, hardware_interface::EffortJointInterface > {
+    : public ci::MultiInterfaceController< hi::JointStateInterface, hi::EffortJointInterface > {
 private:
   struct JointInfo {
     // required info for both observed/controlled joints
-    dart::dynamics::Joint *model_joint;
-    hardware_interface::JointStateHandle joint_state_handle;
+    dd::Joint *model_joint;
+    hi::JointStateHandle joint_state_handle;
 
     // optional info for controlled joints
-    boost::optional< control_toolbox::Pid > pid;
-    boost::optional< hardware_interface::JointHandle > joint_command_handle;
+    boost::optional< ct::Pid > pid;
+    boost::optional< hi::JointHandle > joint_command_handle;
   };
 
 public:
@@ -52,13 +52,7 @@ public:
 
   // required interfaces as a Controller
 
-  virtual bool init(hardware_interface::RobotHW *hw, ros::NodeHandle &root_nh,
-                    ros::NodeHandle &controller_nh) {
-    namespace ct = control_toolbox;
-    namespace dc = dart::common;
-    namespace dd = dart::dynamics;
-    namespace du = dart::utils;
-    namespace hi = hardware_interface;
+  virtual bool init(hi::RobotHW *hw, ros::NodeHandle &root_nh, ros::NodeHandle &controller_nh) {
     namespace rn = ros::names;
     namespace rp = ros::param;
 
@@ -193,8 +187,8 @@ public:
   }
 
 private:
-  dart::dynamics::SkeletonPtr model_;
-  dart::dynamics::FreeJoint *model_root_joint_;
+  dd::SkeletonPtr model_;
+  dd::FreeJoint *model_root_joint_;
   std::vector< JointInfo > joints_;
 };
 } // namespace computed_torque_controller
