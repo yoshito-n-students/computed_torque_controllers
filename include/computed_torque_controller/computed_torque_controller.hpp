@@ -168,22 +168,25 @@ public:
     }
 
     // generate control input
-    Eigen::VectorXd u(joints_.size());
-    for (std::size_t i = 0; i < joints_.size(); ++i) {
-      // TODO: get desired position from command topics
-      const double pos_cmd(0.);
-      u(i) = joints_[i].pid ? joints_[i].pid->computeCommand(
-                                  pos_cmd - joints_[i].joint_state_handle.getPosition(), period)
-                            : 0.;
+    Eigen::VectorXd u(Eigen::VectorXd::Zero(joints_.size() * 3));
+    for (std::size_t ji = 0; ji < joints_.size(); ++ji) {
+      if (joints_[ji].pid) {
+        const std::size_t ui(ji * 3);
+        // TODO: get desired position from command topics
+        const double pos_cmd(0.);
+        u(ui) = joints_[ji].pid->computeCommand(
+            pos_cmd - joints_[ji].joint_state_handle.getPosition(), period);
+      }
     }
 
     // compute required torque
     const Eigen::VectorXd t(model_->getMassMatrix() * u + model_->getCoriolisAndGravityForces());
 
     // set torque commands
-    for (std::size_t i = 0; i < joints_.size(); ++i) {
-      if (joints_[i].joint_command_handle) {
-        joints_[i].joint_command_handle->setCommand(t(i));
+    for (std::size_t ji = 0; ji < joints_.size(); ++ji) {
+      if (joints_[ji].joint_command_handle) {
+        const std::size_t ti(ji * 3);
+        joints_[ji].joint_command_handle->setCommand(t(ti));
       }
     }
   }
