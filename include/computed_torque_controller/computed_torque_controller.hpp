@@ -39,11 +39,11 @@ private:
     // required info for both observed/controlled joints
     dd::Joint *model_joint;
     std::size_t id_in_model;
-    hi::JointStateHandle joint_state_handle;
+    hi::JointStateHandle hw_state_handle;
 
     // optional info for controlled joints
     boost::optional< ct::Pid > pid;
-    boost::optional< hi::JointHandle > joint_command_handle;
+    boost::optional< hi::JointHandle > hw_cmd_handle;
   };
 
 public:
@@ -59,8 +59,8 @@ public:
 
     // get required hardware interfaces
     // (no need to check existence of interfaces because the base class did it)
-    hi::JointStateInterface *const joint_state_iface(hw->get< hi::JointStateInterface >());
-    hi::EffortJointInterface *const joint_command_iface(hw->get< hi::EffortJointInterface >());
+    hi::JointStateInterface *const hw_state_iface(hw->get< hi::JointStateInterface >());
+    hi::EffortJointInterface *const hw_cmd_iface(hw->get< hi::EffortJointInterface >());
 
     // build a dynamics model from robot_description param
     {
@@ -113,7 +113,7 @@ public:
       // hardware joint state handle
       const std::string joint_name(joint_info.model_joint->getName());
       try {
-        joint_info.joint_state_handle = joint_state_iface->getHandle(joint_name);
+        joint_info.hw_state_handle = hw_state_iface->getHandle(joint_name);
       } catch (const hi::HardwareInterfaceException &ex) {
         ROS_ERROR_STREAM("ComputedTorqueController::init(): Failed to get the state handle of '"
                          << joint_name << "': " << ex.what());
@@ -131,7 +131,7 @@ public:
         }
         // hardware joint command handle
         try {
-          joint_info.joint_command_handle = joint_command_iface->getHandle(joint_name);
+          joint_info.hw_cmd_handle = hw_cmd_iface->getHandle(joint_name);
         } catch (const hi::HardwareInterfaceException &ex) {
           ROS_ERROR_STREAM("ComputedTorqueController::init(): Failed to get the command handle of '"
                            << joint_name << "': " << ex.what());
@@ -165,8 +165,8 @@ public:
 
     // update model joint states from the hardware
     BOOST_FOREACH (JointInfo &joint, joints_) {
-      model_->setPosition(joint.id_in_model, joint.joint_state_handle.getPosition());
-      model_->setVelocity(joint.id_in_model, joint.joint_state_handle.getVelocity());
+      model_->setPosition(joint.id_in_model, joint.hw_state_handle.getPosition());
+      model_->setVelocity(joint.id_in_model, joint.hw_state_handle.getVelocity());
     }
 
     // generate control input for each joint
@@ -176,7 +176,7 @@ public:
         // TODO: get desired position from command topics
         const double pos_cmd(0.);
         u(joint.id_in_model) =
-            joint.pid->computeCommand(pos_cmd - joint.joint_state_handle.getPosition(), period);
+            joint.pid->computeCommand(pos_cmd - joint.hw_state_handle.getPosition(), period);
       }
     }
 
@@ -185,8 +185,8 @@ public:
 
     // set torque commands
     BOOST_FOREACH (JointInfo &joint, joints_) {
-      if (joint.joint_command_handle) {
-        joint.joint_command_handle->setCommand(t(joint.id_in_model));
+      if (joint.hw_cmd_handle) {
+        joint.hw_cmd_handle->setCommand(t(joint.id_in_model));
       }
     }
   }
