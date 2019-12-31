@@ -175,7 +175,7 @@ public:
       if (joint.pid) {
         // TODO: get desired position from command topics
         const double pos_cmd(0.);
-        u(joint.id_in_model) =
+        u[joint.id_in_model] =
             joint.pid->computeCommand(pos_cmd - joint.hw_state_handle.getPosition(), period);
       }
     }
@@ -186,7 +186,7 @@ public:
     // set torque commands
     BOOST_FOREACH (JointInfo &joint, joints_) {
       if (joint.hw_cmd_handle) {
-        joint.hw_cmd_handle->setCommand(t(joint.id_in_model));
+        joint.hw_cmd_handle->setCommand(t[joint.id_in_model]);
       }
     }
   }
