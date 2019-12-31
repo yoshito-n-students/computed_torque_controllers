@@ -97,6 +97,13 @@ public:
       if (model_joint == model_->getRootJoint()) {
         continue;
       }
+      // assert single Dof joint
+      if (model_joint->getNumDofs() != 1) {
+        ROS_ERROR_STREAM(
+            "ComputedTorqueController::init(): Multi-Dof joint is not supported (name: '"
+            << model_joint->getName() << "', dofs: " << model_joint->getNumDofs() << ")");
+        return false;
+      }
       // start composing joint info
       JointInfo joint_info;
       // get the joint in the dynamics model
