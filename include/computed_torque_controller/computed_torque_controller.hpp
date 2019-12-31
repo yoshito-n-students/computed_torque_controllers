@@ -38,6 +38,7 @@ private:
   struct JointInfo {
     // required info for both observed/controlled joints
     dd::Joint *model_joint;
+    std::size_t id_in_model;
     hi::JointStateHandle joint_state_handle;
 
     // optional info for controlled joints
@@ -108,6 +109,7 @@ public:
       JointInfo joint_info;
       // get the joint in the dynamics model
       joint_info.model_joint = model_joint;
+      joint_info.id_in_model = model_joint->getIndexInSkeleton(/* 1st DoF */ 0);
       // hardware joint state handle
       const std::string joint_name(joint_info.model_joint->getName());
       try {
@@ -161,21 +163,20 @@ public:
     model_root_joint_->setLinearAcceleration(Eigen::Vector3d::Zero());
     model_root_joint_->setAngularAcceleration(Eigen::Vector3d::Zero());
 
-    // update model joints by hardware states
+    // update model joint states from the hardware
     BOOST_FOREACH (JointInfo &joint, joints_) {
-      joint.model_joint->setPosition(0, joint.joint_state_handle.getPosition());
-      joint.model_joint->setVelocity(0, joint.joint_state_handle.getVelocity());
+      model_->setPosition(joint.id_in_model, joint.joint_state_handle.getPosition());
+      model_->setVelocity(joint.id_in_model, joint.joint_state_handle.getVelocity());
     }
 
-    // generate control input
-    Eigen::VectorXd u(Eigen::VectorXd::Zero(joints_.size() * 3));
-    for (std::size_t ji = 0; ji < joints_.size(); ++ji) {
-      if (joints_[ji].pid) {
-        const std::size_t ui(ji * 3);
+    // generate control input for each joint
+    Eigen::VectorXd u(Eigen::VectorXd::Zero(model_->getNumDofs()));
+    BOOST_FOREACH (JointInfo &joint, joints_) {
+      if (joint.pid) {
         // TODO: get desired position from command topics
         const double pos_cmd(0.);
-        u(ui) = joints_[ji].pid->computeCommand(
-            pos_cmd - joints_[ji].joint_state_handle.getPosition(), period);
+        u(joint.id_in_model) =
+            joint.pid->computeCommand(pos_cmd - joint.joint_state_handle.getPosition(), period);
       }
     }
 
@@ -183,10 +184,9 @@ public:
     const Eigen::VectorXd t(model_->getMassMatrix() * u + model_->getCoriolisAndGravityForces());
 
     // set torque commands
-    for (std::size_t ji = 0; ji < joints_.size(); ++ji) {
-      if (joints_[ji].joint_command_handle) {
-        const std::size_t ti(ji * 3);
-        joints_[ji].joint_command_handle->setCommand(t(ti));
+    BOOST_FOREACH (JointInfo &joint, joints_) {
+      if (joint.joint_command_handle) {
+        joint.joint_command_handle->setCommand(t(joint.id_in_model));
       }
     }
   }
