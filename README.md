@@ -26,7 +26,7 @@ ___<controller_namespace>/robot_description___ or ___robot_description___ (strin
 * robot description in URDF
 
 ___<controller_namespace>/joints/<joint_name>___ (struct, required)
-* control_toolbox::Pid
+* control_toolbox::Pid for each controlled joint will be initialized using these parameters
 
 ```
 # Parameter example
