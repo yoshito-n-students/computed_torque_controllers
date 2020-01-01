@@ -102,6 +102,7 @@ public:
     hi::EffortJointInterface *const hw_cmd_iface(hw->get< hi::EffortJointInterface >());
 
     // match joint in the dynamics model & hardware (except the model root joint)
+    std::size_t n_controlled_joints(0);
     BOOST_FOREACH (dd::Joint *const model_joint, model_->getJoints()) {
       // skip if the model root joint
       if (model_joint == model_->getRootJoint()) {
@@ -151,9 +152,16 @@ public:
         joint_info.cmd_sub = controller_nh.subscribe< std_msgs::Float64 >(
             rn::append(joint_name, "command"), 1,
             boost::bind(&ComputedTorqueController::commandCB, _1, joint_info.cmd_buf));
+        // increment count of controlled joints
+        ++n_controlled_joints;
       }
       // store joint info
       joints_.push_back(joint_info);
+    }
+
+    // kind warning if no controlled joints
+    if (n_controlled_joints == 0) {
+      ROS_WARN("ComputedTorqueController::init(): No controlled joint given. Will do nothing");
     }
 
     return true;
