@@ -6,9 +6,9 @@ The controller expects a general rigid body dynamics system, whose equations of 
 
 <img src="https://latex.codecogs.com/gif.latex?M(q)\ddot{q}+C(q,\dot{q})+g(q)=\tau" />
 
-where q, M, C, and g are the joint position vector, inertia matrix, Colioris vector, and gravity vector.
+where <img src="https://latex.codecogs.com/gif.latex?q" />, <img src="https://latex.codecogs.com/gif.latex?M(\cdot)" />, <img src="https://latex.codecogs.com/gif.latex?C(\cdot)" />, and <img src="https://latex.codecogs.com/gif.latex?g(\cdot)" /> are the joint position vector, inertia matrix, Colioris vector, and gravity vector.
 
-The controller computes the joint effort commands to track the desired joint positions with complensation for the inertia, Colioris, and gravity forces.
+The controller computes the joint effort commands <img src="https://latex.codecogs.com/gif.latex?\tau_d" /> to track the desired joint positions <img src="https://latex.codecogs.com/gif.latex?q_d" /> with complensation for the inertia, Colioris, and gravity forces.
 
 <img src="https://latex.codecogs.com/gif.latex?\tau_d=M(q)(\ddot{q}+PID(q_d))+C(q,\dot{q})+g(q)" />
 
