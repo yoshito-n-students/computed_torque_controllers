@@ -44,4 +44,8 @@ computed_torque_conotroller:
         # Controlled joint 2
         joint_b:
             ...
+
+# 'computed_torque_controller/joint_a/command',
+# 'computed_torque_controller/joint_b/command'
+# will be subscribed by the controller
 ```
