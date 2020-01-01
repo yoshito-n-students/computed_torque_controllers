@@ -188,13 +188,15 @@ public:
     model_root_joint_->setTransform(Eigen::Isometry3d::Identity());
     model_root_joint_->setLinearVelocity(Eigen::Vector3d::Zero());
     model_root_joint_->setAngularVelocity(Eigen::Vector3d::Zero());
-    model_root_joint_->setLinearAcceleration(Eigen::Vector3d::Zero());
-    model_root_joint_->setAngularAcceleration(Eigen::Vector3d::Zero());
 
     // update model joint states from the hardware
     BOOST_FOREACH (JointInfo &joint, joints_) {
-      model_->setPosition(joint.id_in_model, joint.hw_state_handle.getPosition());
-      model_->setVelocity(joint.id_in_model, joint.hw_state_handle.getVelocity());
+      // set position forwarded by one time step to make control more stable
+      // (recommended in https://dartsim.github.io/tutorials_manipulator.html)
+      const double vel(joint.hw_state_handle.getVelocity());
+      model_->setPosition(joint.id_in_model,
+                          joint.hw_state_handle.getPosition() + vel * period.toSec());
+      model_->setVelocity(joint.id_in_model, vel);
     }
 
     // generate control input for each joint
