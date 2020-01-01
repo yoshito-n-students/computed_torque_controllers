@@ -13,6 +13,8 @@ namespace utils {}
 
 namespace hardware_interface {}
 
+namespace realtime_tools {}
+
 namespace computed_torque_controller {
 namespace ci = controller_interface;
 namespace ct = control_toolbox;
@@ -20,6 +22,7 @@ namespace dc = dart::common;
 namespace dd = dart::dynamics;
 namespace du = dart::utils;
 namespace hi = hardware_interface;
+namespace rt = realtime_tools;
 } // namespace computed_torque_controller
 
 #endif
