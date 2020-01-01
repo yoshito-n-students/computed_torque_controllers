@@ -10,7 +10,9 @@ where <img src="https://latex.codecogs.com/gif.latex?q" />, <img src="https://la
 
 The controller computes the joint effort commands <img src="https://latex.codecogs.com/gif.latex?\tau_d" /> to track the desired joint positions <img src="https://latex.codecogs.com/gif.latex?q_d" /> with complensation for the inertia, Colioris, and gravity forces.
 
-<img src="https://latex.codecogs.com/gif.latex?\tau_d=M(q)(\ddot{q}+PID(q_d))+C(q,\dot{q})+g(q)" />
+<img src="https://latex.codecogs.com/gif.latex?\tau_d=M(q)(\ddot{q}+\textup{PID}(q_d-q))+C(q,\dot{q})+g(q)" />
+
+where <img src="https://latex.codecogs.com/gif.latex?\textup{PID}(\cdot)" /> is the control input to the system based on a PID controller for the position tracking errors.
 
 ### <u>Prerequisites</u>
 * robot description in URDF to build a dynamics model (using dart::utils::DartLoader)
