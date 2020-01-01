@@ -159,9 +159,11 @@ public:
       joints_.push_back(joint_info);
     }
 
-    // kind warning if no controlled joints
+    // assert one controlled joint at least
     if (n_controlled_joints == 0) {
-      ROS_WARN("ComputedTorqueController::init(): No controlled joint given. Will do nothing");
+      ROS_ERROR_STREAM("ComputedTorqueController::init(): No controlled joint loaded from param '"
+                       << controller_nh.resolveName("joints") << "'");
+      return false;
     }
 
     return true;
