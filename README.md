@@ -29,14 +29,17 @@ ___<controller_namespace>/joints/<joint_name>___ (struct, required)
 * control_toolbox::Pid
 
 ```
+# Parameter example
 computed_torque_conotroller:
     type: computed_torque_controller/ComputedTorqueController
     joints:
+        # Controlled joint 1
         joint_a:
             p: 1.
             i: 1.
             d: 1.
             publish_state: true
+        # Controlled joint 2
         joint_b:
             ...
 ```
