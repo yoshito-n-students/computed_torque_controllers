@@ -13,12 +13,15 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
+#include <realtime_tools/realtime_buffer.h>
 #include <ros/console.h>
 #include <ros/duration.h>
 #include <ros/names.h>
 #include <ros/node_handle.h>
 #include <ros/param.h>
+#include <ros/subscriber.h>
 #include <ros/time.h>
+#include <std_msgs/Float64.h>
 
 #include <dart/dynamics/FreeJoint.hpp>
 #include <dart/dynamics/Joint.hpp>
@@ -27,8 +30,10 @@
 
 #include <Eigen/Core>
 
+#include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #include <boost/optional.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace computed_torque_controller {
 
@@ -44,6 +49,10 @@ private:
     // optional info for controlled joints
     boost::optional< ct::Pid > pid;
     boost::optional< hi::JointHandle > hw_cmd_handle;
+    // natively like optional<>
+    ros::Subscriber cmd_sub;
+    // use shared_ptr<> instead of optional<> to make it copy-safe
+    boost::shared_ptr< rt::RealtimeBuffer< double > > cmd_buf;
   };
 
 public:
@@ -56,11 +65,6 @@ public:
   virtual bool init(hi::RobotHW *hw, ros::NodeHandle &root_nh, ros::NodeHandle &controller_nh) {
     namespace rn = ros::names;
     namespace rp = ros::param;
-
-    // get required hardware interfaces
-    // (no need to check existence of interfaces because the base class did it)
-    hi::JointStateInterface *const hw_state_iface(hw->get< hi::JointStateInterface >());
-    hi::EffortJointInterface *const hw_cmd_iface(hw->get< hi::EffortJointInterface >());
 
     // build a dynamics model from robot_description param
     {
@@ -91,6 +95,11 @@ public:
           "ComputedTorqueController::init(): Faild to get a root joint of the dynamics model");
       return false;
     }
+
+    // get required hardware interfaces
+    // (no need to check existence of interfaces because the base class did it)
+    hi::JointStateInterface *const hw_state_iface(hw->get< hi::JointStateInterface >());
+    hi::EffortJointInterface *const hw_cmd_iface(hw->get< hi::EffortJointInterface >());
 
     // match joint in the dynamics model & hardware (except the model root joint)
     BOOST_FOREACH (dd::Joint *const model_joint, model_->getJoints()) {
@@ -137,6 +146,11 @@ public:
                            << joint_name << "': " << ex.what());
           return false;
         }
+        // command subscription
+        joint_info.cmd_buf.reset(new rt::RealtimeBuffer< double >());
+        joint_info.cmd_sub = controller_nh.subscribe< std_msgs::Float64 >(
+            rn::append(joint_name, "command"), 1,
+            boost::bind(&ComputedTorqueController::commandCB, _1, joint_info.cmd_buf));
       }
       // store joint info
       joints_.push_back(joint_info);
@@ -146,10 +160,14 @@ public:
   }
 
   virtual void starting(const ros::Time &time) {
-    // reset PID states
     BOOST_FOREACH (JointInfo &joint, joints_) {
+      // reset PID states
       if (joint.pid) {
         joint.pid->reset();
+      }
+      // reset position commands by present positions
+      if (joint.cmd_buf) {
+        joint.cmd_buf->writeFromNonRT(joint.hw_state_handle.getPosition());
       }
     }
   }
@@ -172,11 +190,9 @@ public:
     // generate control input for each joint
     Eigen::VectorXd u(Eigen::VectorXd::Zero(model_->getNumDofs()));
     BOOST_FOREACH (JointInfo &joint, joints_) {
-      if (joint.pid) {
-        // TODO: get desired position from command topics
-        const double pos_cmd(0.);
-        u[joint.id_in_model] =
-            joint.pid->computeCommand(pos_cmd - joint.hw_state_handle.getPosition(), period);
+      if (joint.pid && joint.cmd_buf) {
+        u[joint.id_in_model] = joint.pid->computeCommand(
+            *joint.cmd_buf->readFromRT() - joint.hw_state_handle.getPosition(), period);
       }
     }
 
@@ -194,6 +210,12 @@ public:
   virtual void stopping(const ros::Time &time) {
     // nothing to do
     // (or set torque commands with zero control input??)
+  }
+
+private:
+  static void commandCB(const std_msgs::Float64ConstPtr &msg,
+                        const boost::shared_ptr< rt::RealtimeBuffer< double > > &buf) {
+    buf->writeFromNonRT(msg->data);
   }
 
 private:
