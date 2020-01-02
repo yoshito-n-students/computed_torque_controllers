@@ -8,9 +8,9 @@ The controller expects a general rigid body dynamics system, whose equations of 
 
 where <img src="https://latex.codecogs.com/gif.latex?q" />, <img src="https://latex.codecogs.com/gif.latex?M(\cdot)" />, <img src="https://latex.codecogs.com/gif.latex?C(\cdot)" />, and <img src="https://latex.codecogs.com/gif.latex?g(\cdot)" /> are the joint position vector, inertia matrix, Colioris vector, and gravity vector.
 
-The controller computes the joint effort commands <img src="https://latex.codecogs.com/gif.latex?\tau_d" /> to track the desired joint positions <img src="https://latex.codecogs.com/gif.latex?q_d" /> with complensation for the inertia, Colioris, and gravity forces.
+The controller computes the joint effort commands <img src="https://latex.codecogs.com/gif.latex?\tau_d" /> to track the joint position setpoints <img src="https://latex.codecogs.com/gif.latex?q_{\textup{sp}}" /> with compensation for the inertia, Colioris, and gravity forces.
 
-<img src="https://latex.codecogs.com/gif.latex?\tau_d=M(q)(\ddot{q}+\textup{PID}(q_d-q))+C(q,\dot{q})+g(q)" />
+<img src="https://latex.codecogs.com/gif.latex?\tau_d=M(q)(\ddot{q}+\textup{PID}(q_{\textup{sp}}-q))+C(q,\dot{q})+g(q)" />
 
 where <img src="https://latex.codecogs.com/gif.latex?\textup{PID}(\cdot)" /> is the control input to the system based on a PID controller for the position tracking errors.
 
