@@ -11,11 +11,13 @@ find_package(catkin REQUIRED COMPONENTS
   controller_interface
   control_toolbox
   hardware_interface
+  joint_limits_interface
   pluginlib
   realtime_tools
   roscpp
   roslib
   std_msgs
+  urdf
 )
 
 ## System dependencies are found with CMake's conventions
@@ -117,7 +119,17 @@ unset(TINYXML2_INCLUDE_DIRS CACHE)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES computed_torque_controller
-  CATKIN_DEPENDS controller_interface control_toolbox hardware_interface pluginlib realtime_tools roscpp roslib std_msgs
+  CATKIN_DEPENDS 
+    controller_interface 
+    control_toolbox 
+    hardware_interface 
+    joint_limits_interface 
+    pluginlib 
+    realtime_tools 
+    roscpp 
+    roslib 
+    std_msgs 
+    urdf
 #  DEPENDS system_lib
 )
 
