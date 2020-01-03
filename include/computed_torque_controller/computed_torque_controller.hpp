@@ -257,10 +257,10 @@ public:
           ctl_joint->pos_sp - ctl_joint->hw_state_handle.getPosition(), period);
     }
 
-    // compute required torque
+    // compute required effort
     const Eigen::VectorXd t(model_->getMassMatrix() * u + model_->getCoriolisAndGravityForces());
 
-    // set torque commands
+    // set effort commands to the hardware
     BOOST_FOREACH (const ControlledJointInfoPtr &ctl_joint, controlled_joints_) {
       ctl_joint->hw_eff_cmd_handle.setCommand(t[ctl_joint->id_in_model]);
     }
@@ -268,7 +268,7 @@ public:
 
   virtual void stopping(const ros::Time &time) {
     // nothing to do
-    // (or set torque commands with zero control input??)
+    // (or set effort commands with zero control input??)
   }
 
 private:

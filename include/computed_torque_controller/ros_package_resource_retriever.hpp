@@ -60,7 +60,7 @@ public:
       return src_uri;
     }
 
-    // resolve the package path
+    // resolve the package path, as reaching here means the scheme of the given URI is 'package'
     const std::string package_path(ros::package::getPath(src_uri.mAuthority.get()));
     // handle the case 3; unresolved package name
     if (package_path.empty()) {
