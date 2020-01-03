@@ -25,7 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 # https://bitbucket.org/osrf/gazebo/issues/2650/catkin-build-cannot-find-tinyxml2-tinyxml2
 unset(TINYXML2_INCLUDE_DIRS CACHE)
-find_package(DART 6.9.2 REQUIRED COMPONENTS 
+find_package(DART 6.9.0 REQUIRED COMPONENTS 
   utils-urdf
   CONFIG
 )
