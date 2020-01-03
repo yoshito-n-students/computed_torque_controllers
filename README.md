@@ -15,7 +15,7 @@ The controller computes the joint effort commands <img src="https://latex.codeco
 where <img src="https://latex.codecogs.com/gif.latex?\textup{PID}(\cdot)" /> is the control input to the system based on a PID controller for the position tracking errors.
 
 ### <u>Prerequisites</u>
-* robot description in URDF to build a dynamics model (using dart::utils::DartLoader)
+* robot description in URDF to build a dynamics model (using [dart](https://dartsim.github.io/dart/)::utils::DartLoader)
 * hardware_interface/JointStateHandle for all joints appeared in the model
 * hardware_interface/EffortJointHandle for controlled joints specified by the controller param
 
@@ -28,7 +28,7 @@ ___<controller_namespace>/robot_description___ or ___robot_description___ (strin
 * robot description in URDF
 
 ___<controller_namespace>/joints/<joint_name>___ (struct, required)
-* control_toolbox::Pid for each controlled joint will be initialized using these parameters
+* [control_toolbox](http://wiki.ros.org/control_toolbox)::Pid for each controlled joint will be initialized using these parameters
 
 ```
 # Parameter example
@@ -49,3 +49,10 @@ computed_torque_conotroller:
 # 'computed_torque_controller/joint_b/command'
 # will be subscribed by the controller
 ```
+
+### <u>Example</u>
+* [computed_torque_controller_example](https://github.com/yoshito-n-students/computed_torque_controller_example)
+
+### <u>Reference</u>
+* [Dart simulator's tutorial for manipulator control](https://dartsim.github.io/tutorials_manipulator.html#lesson-2c-write-a-stable-pd-controller-for-the-manipulator)
+* [Gazebo simulator's GravityCompensationPlugin](https://bitbucket.org/osrf/gazebo/src/default/plugins/GravityCompensationPlugin.cc)
