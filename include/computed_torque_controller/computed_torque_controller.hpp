@@ -45,25 +45,28 @@ namespace computed_torque_controller {
 class ComputedTorqueController
     : public ci::MultiInterfaceController< hi::JointStateInterface, hi::EffortJointInterface > {
 private:
-  struct JointInfo {
-    // required info for both observed/controlled joints
+  struct ObservedJointInfo {
     // [dynamics model]
     dd::Joint *model_joint;
     std::size_t id_in_model;
-    // [observed state from the hardware]
+    // [state from the hardware]
     hi::JointStateHandle hw_state_handle;
+  };
+  typedef boost::shared_ptr< ObservedJointInfo > ObservedJointInfoPtr;
+  typedef boost::shared_ptr< const ObservedJointInfo > ObservedJointInfoConstPtr;
 
-    // optional info for controlled joints
+  struct ControlledJointInfo : public ObservedJointInfo {
     // [position setpoint (input) from ROS topic]
-    boost::optional< double > pos_sp;
-    boost::shared_ptr< rt::RealtimeBuffer< double > > pos_sp_buf;
+    double pos_sp;
+    rt::RealtimeBuffer< double > pos_sp_buf;
     ros::Subscriber pos_sp_sub;
     boost::optional< jli::PositionJointSaturationHandle > pos_sp_sat_handle;
     // [effort command (output) to the hardware]
-    boost::optional< hi::JointHandle > hw_eff_cmd_handle;
+    hi::JointHandle hw_eff_cmd_handle;
     // [PID controller to generate effort command based on position error]
-    boost::optional< ct::Pid > pid;
+    ct::Pid pid;
   };
+  typedef boost::shared_ptr< ControlledJointInfo > ControlledJointInfoPtr;
 
 public:
   ComputedTorqueController() {}
@@ -115,64 +118,72 @@ public:
 
     // get required hardware interfaces
     // (no need to check existence of interfaces because the base class did it)
-    hi::JointStateInterface *const hw_state_iface(hw->get< hi::JointStateInterface >());
-    hi::EffortJointInterface *const hw_eff_cmd_iface(hw->get< hi::EffortJointInterface >());
+    hi::JointStateInterface &hw_state_iface(*hw->get< hi::JointStateInterface >());
+    hi::EffortJointInterface &hw_eff_cmd_iface(*hw->get< hi::EffortJointInterface >());
 
-    // match joint in the dynamics model & hardware (except the model root joint)
-    std::size_t n_controlled_joints(0);
+    // compose joint info by matching joints in the dynamics model & hardware
     BOOST_FOREACH (dd::Joint *const model_joint, model_->getJoints()) {
-      // skip if the model root joint
+      // skip the model root joint already handled
       if (model_joint == model_->getRootJoint()) {
         continue;
       }
-      // assert single Dof joint
+
+      // assert single Dof model joint because hw joint only supports single Dof
+      const std::string joint_name(model_joint->getName());
       if (model_joint->getNumDofs() != 1) {
         ROS_ERROR_STREAM(
             "ComputedTorqueController::init(): Multi-Dof joint is not supported (name: '"
-            << model_joint->getName() << "', dofs: " << model_joint->getNumDofs() << ")");
+            << joint_name << "', dofs: " << model_joint->getNumDofs() << ")");
         return false;
       }
 
-      // start composing joint info
-      JointInfo joint_info;
+      // allocate joint info (observed or observed-and-controlled)
+      ObservedJointInfoPtr joint_info;
+      ControlledJointInfoPtr ctl_joint_info;
+      const std::string joint_ns(controller_nh.resolveName(rn::append("joints", joint_name)));
+      if (rp::has(joint_ns)) {
+        ctl_joint_info.reset(new ControlledJointInfo());
+        joint_info = ctl_joint_info;
+      } else {
+        joint_info.reset(new ObservedJointInfo());
+      }
 
-      // get the joint in the dynamics model
-      joint_info.model_joint = model_joint;
-      joint_info.id_in_model = model_joint->getIndexInSkeleton(/* 1st DoF */ 0);
+      // for each joint: info about the dynamics model
+      joint_info->model_joint = model_joint;
+      joint_info->id_in_model = model_joint->getIndexInSkeleton(/* 1st DoF */ 0);
 
-      // hardware joint state handle
-      const std::string joint_name(joint_info.model_joint->getName());
+      // for each joint: info about hardware joint state handle
       try {
-        joint_info.hw_state_handle = hw_state_iface->getHandle(joint_name);
+        joint_info->hw_state_handle = hw_state_iface.getHandle(joint_name);
       } catch (const hi::HardwareInterfaceException &ex) {
         ROS_ERROR_STREAM("ComputedTorqueController::init(): Failed to get the state handle of '"
                          << joint_name << "': " << ex.what());
         return false;
       }
 
-      // optional info for a controlled joint
-      const std::string joint_ns(controller_nh.resolveName(rn::append("joints", joint_name)));
-      if (rp::has(joint_ns)) {
-        // [position setpoint from ROS topic]
-        // value
-        joint_info.pos_sp = std::numeric_limits< double >::quiet_NaN();
+      // store info required for all joints
+      all_joints_.push_back(joint_info);
+
+      // optional procedure for contolled joints
+      if (ctl_joint_info) {
+        // [info about position setpoint from ROS topic]
         // subscription
-        joint_info.pos_sp_buf.reset(new rt::RealtimeBuffer< double >());
-        joint_info.pos_sp_sub = controller_nh.subscribe< std_msgs::Float64 >(
+        ctl_joint_info->pos_sp_sub = controller_nh.subscribe< std_msgs::Float64 >(
             rn::append(joint_name, "command"), 1,
-            boost::bind(&ComputedTorqueController::positionSetpointCB, _1, joint_info.pos_sp_buf));
-        // satulation based on limits
+            boost::bind(&ComputedTorqueController::positionSetpointCB, _1,
+                        &ctl_joint_info->pos_sp_buf));
+        // satulation based on limits (optional)
         jli::JointLimits pos_sp_limits;
         if (jli::getJointLimits(urdf_desc.getJoint(joint_name), pos_sp_limits)) {
-          const hi::JointHandle pos_sp_handle(joint_info.hw_state_handle,
-                                              joint_info.pos_sp.get_ptr());
-          joint_info.pos_sp_sat_handle =
+          const hi::JointHandle pos_sp_handle(ctl_joint_info->hw_state_handle,
+                                              &ctl_joint_info->pos_sp);
+          ctl_joint_info->pos_sp_sat_handle =
               jli::PositionJointSaturationHandle(pos_sp_handle, pos_sp_limits);
         }
 
         // [effort command to the hardware]
         try {
-          joint_info.hw_eff_cmd_handle = hw_eff_cmd_iface->getHandle(joint_name);
+          ctl_joint_info->hw_eff_cmd_handle = hw_eff_cmd_iface.getHandle(joint_name);
         } catch (const hi::HardwareInterfaceException &ex) {
           ROS_ERROR_STREAM(
               "ComputedTorqueController::init(): Failed to get the effort command handle of '"
@@ -181,23 +192,19 @@ public:
         }
 
         // [PID controller to generate effort command based on position error]
-        joint_info.pid = ct::Pid();
-        if (!joint_info.pid->initParam(joint_ns)) {
+        if (!ctl_joint_info->pid.initParam(joint_ns)) {
           ROS_ERROR_STREAM("ComputedTorqueController::init(): Failed to init a PID by param '"
                            << joint_ns << "'");
           return false;
         }
 
-        // increment count of controlled joints
-        ++n_controlled_joints;
+        // store info required only for controlled joints
+        controlled_joints_.push_back(ctl_joint_info);
       }
-
-      // store joint info
-      joints_.push_back(joint_info);
     }
 
     // assert one controlled joint at least
-    if (n_controlled_joints == 0) {
+    if (controlled_joints_.empty()) {
       ROS_ERROR_STREAM("ComputedTorqueController::init(): No controlled joint loaded from param '"
                        << controller_nh.resolveName("joints") << "'");
       return false;
@@ -207,18 +214,14 @@ public:
   }
 
   virtual void starting(const ros::Time &time) {
-    BOOST_FOREACH (JointInfo &joint, joints_) {
+    BOOST_FOREACH (const ControlledJointInfoPtr &ctl_joint, controlled_joints_) {
       // reset position setpoints by present positions
-      if (joint.pos_sp_buf) {
-        joint.pos_sp_buf->writeFromNonRT(joint.hw_state_handle.getPosition());
+      ctl_joint->pos_sp_buf.writeFromNonRT(ctl_joint->hw_state_handle.getPosition());
+      // reset stateful objects
+      if (ctl_joint->pos_sp_sat_handle) {
+        ctl_joint->pos_sp_sat_handle->reset();
       }
-      if (joint.pos_sp_sat_handle) {
-        joint.pos_sp_sat_handle->reset();
-      }
-      // reset PID states
-      if (joint.pid) {
-        joint.pid->reset();
-      }
+      ctl_joint->pid.reset();
     }
   }
 
@@ -230,41 +233,36 @@ public:
     model_root_joint_->setAngularVelocity(Eigen::Vector3d::Zero());
 
     // update model joint states from the hardware
-    BOOST_FOREACH (JointInfo &joint, joints_) {
+    BOOST_FOREACH (const ObservedJointInfoConstPtr &joint, all_joints_) {
       // set position forwarded by one time step to make control more stable
       // (recommended in https://dartsim.github.io/tutorials_manipulator.html)
-      const double vel(joint.hw_state_handle.getVelocity());
-      model_->setPosition(joint.id_in_model,
-                          joint.hw_state_handle.getPosition() + vel * period.toSec());
-      model_->setVelocity(joint.id_in_model, vel);
+      const double pos(joint->hw_state_handle.getPosition());
+      const double vel(joint->hw_state_handle.getVelocity());
+      model_->setPosition(joint->id_in_model, pos + vel * period.toSec());
+      model_->setVelocity(joint->id_in_model, vel);
+      // TODO: set acceleration to consider inertial force ??
     }
 
     // generate control input for each joint
     Eigen::VectorXd u(Eigen::VectorXd::Zero(model_->getNumDofs()));
-    BOOST_FOREACH (JointInfo &joint, joints_) {
-      // skip non-controlled joints
-      if (!joint.pos_sp || !joint.pos_sp_buf || !joint.pid) {
-        continue;
-      }
+    BOOST_FOREACH (const ControlledJointInfoPtr &ctl_joint, controlled_joints_) {
       // copy position setpoint from the buffer
-      joint.pos_sp = *joint.pos_sp_buf->readFromRT();
-      // satualate the position setpoint
-      if (joint.pos_sp_sat_handle) {
-        joint.pos_sp_sat_handle->enforceLimits(period);
+      ctl_joint->pos_sp = *ctl_joint->pos_sp_buf.readFromRT();
+      // satualate the position setpoint (optional)
+      if (ctl_joint->pos_sp_sat_handle) {
+        ctl_joint->pos_sp_sat_handle->enforceLimits(period);
       }
       // compute control input based on position error
-      u[joint.id_in_model] = joint.pid->computeCommand(
-          joint.pos_sp.get() - joint.hw_state_handle.getPosition(), period);
+      u[ctl_joint->id_in_model] = ctl_joint->pid.computeCommand(
+          ctl_joint->pos_sp - ctl_joint->hw_state_handle.getPosition(), period);
     }
 
     // compute required torque
     const Eigen::VectorXd t(model_->getMassMatrix() * u + model_->getCoriolisAndGravityForces());
 
     // set torque commands
-    BOOST_FOREACH (JointInfo &joint, joints_) {
-      if (joint.hw_eff_cmd_handle) {
-        joint.hw_eff_cmd_handle->setCommand(t[joint.id_in_model]);
-      }
+    BOOST_FOREACH (const ControlledJointInfoPtr &ctl_joint, controlled_joints_) {
+      ctl_joint->hw_eff_cmd_handle.setCommand(t[ctl_joint->id_in_model]);
     }
   }
 
@@ -275,14 +273,15 @@ public:
 
 private:
   static void positionSetpointCB(const std_msgs::Float64ConstPtr &msg,
-                                 const boost::shared_ptr< rt::RealtimeBuffer< double > > &buf) {
+                                 rt::RealtimeBuffer< double > *const buf) {
     buf->writeFromNonRT(msg->data);
   }
 
 private:
   dd::SkeletonPtr model_;
   dd::FreeJoint *model_root_joint_;
-  std::vector< JointInfo > joints_;
+  std::vector< ObservedJointInfoConstPtr > all_joints_;
+  std::vector< ControlledJointInfoPtr > controlled_joints_;
 };
 } // namespace computed_torque_controller
 
