@@ -243,6 +243,10 @@ public:
       // TODO: set acceleration to consider inertial force ??
     }
 
+    // updated equations of motion
+    const Eigen::MatrixXd &M(model_->getMassMatrix());
+    const Eigen::VectorXd &Cg(model_->getCoriolisAndGravityForces());
+
     // generate control input for each joint
     Eigen::VectorXd u(Eigen::VectorXd::Zero(model_->getNumDofs()));
     BOOST_FOREACH (const ControlledJointInfoPtr &ctl_joint, controlled_joints_) {
@@ -257,12 +261,10 @@ public:
           ctl_joint->pos_sp - ctl_joint->hw_state_handle.getPosition(), period);
     }
 
-    // compute required effort
-    const Eigen::VectorXd t(model_->getMassMatrix() * u + model_->getCoriolisAndGravityForces());
-
     // set effort commands to the hardware
     BOOST_FOREACH (const ControlledJointInfoPtr &ctl_joint, controlled_joints_) {
-      ctl_joint->hw_eff_cmd_handle.setCommand(t[ctl_joint->id_in_model]);
+      ctl_joint->hw_eff_cmd_handle.setCommand(M.row(ctl_joint->id_in_model) * u +
+                                              Cg[ctl_joint->id_in_model]);
     }
   }
 
