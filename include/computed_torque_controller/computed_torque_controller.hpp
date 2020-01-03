@@ -132,11 +132,14 @@ public:
             << model_joint->getName() << "', dofs: " << model_joint->getNumDofs() << ")");
         return false;
       }
+
       // start composing joint info
       JointInfo joint_info;
+
       // get the joint in the dynamics model
       joint_info.model_joint = model_joint;
       joint_info.id_in_model = model_joint->getIndexInSkeleton(/* 1st DoF */ 0);
+
       // hardware joint state handle
       const std::string joint_name(joint_info.model_joint->getName());
       try {
@@ -146,6 +149,7 @@ public:
                          << joint_name << "': " << ex.what());
         return false;
       }
+
       // optional info for a controlled joint
       const std::string joint_ns(controller_nh.resolveName(rn::append("joints", joint_name)));
       if (rp::has(joint_ns)) {
@@ -165,6 +169,7 @@ public:
           joint_info.pos_sp_sat_handle =
               jli::PositionJointSaturationHandle(pos_sp_handle, pos_sp_limits);
         }
+
         // [effort command to the hardware]
         try {
           joint_info.hw_eff_cmd_handle = hw_eff_cmd_iface->getHandle(joint_name);
@@ -174,6 +179,7 @@ public:
               << joint_name << "': " << ex.what());
           return false;
         }
+
         // [PID controller to generate effort command based on position error]
         joint_info.pid = ct::Pid();
         if (!joint_info.pid->initParam(joint_ns)) {
@@ -181,9 +187,11 @@ public:
                            << joint_ns << "'");
           return false;
         }
+
         // increment count of controlled joints
         ++n_controlled_joints;
       }
+
       // store joint info
       joints_.push_back(joint_info);
     }
