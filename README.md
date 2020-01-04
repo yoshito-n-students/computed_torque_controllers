@@ -15,9 +15,12 @@ The controller computes the joint effort commands <img src="https://latex.codeco
 where <img src="https://latex.codecogs.com/gif.latex?\textup{PID}(\cdot)" /> is the control input to the system based on a PID controller for the position tracking errors.
 
 ### <u>Prerequisites</u>
-* robot description in URDF to build a dynamics model (using [dart](https://dartsim.github.io/dart/)::utils::DartLoader)
+* Robot description in URDF to build a dynamics model (using [dart](https://dartsim.github.io/dart/)::utils::DartLoader)
 * hardware_interface/JointStateHandle for all joints appeared in the model
 * hardware_interface/EffortJointHandle for controlled joints specified by the controller param
+* Tested environments
+  * Ubuntu 16.04 + ROS Kinetic + Dart 6.9.0 + Gazebo 7.16.0
+  * Ubuntu 18.04 + ROS Melodic + Dart 6.9.2 + Gazebo 9.11.0
 
 ### <u>Subscribed topics</u>
 ___<controller_namespace>/<joint_name>/command___ (std_msgs/Float64)
@@ -25,7 +28,7 @@ ___<controller_namespace>/<joint_name>/command___ (std_msgs/Float64)
 
 ### <u>Parameters</u>
 ___<controller_namespace>/robot_description___ or ___robot_description___ (string, required)
-* robot description in URDF
+* Robot description in URDF
 
 ___<controller_namespace>/joints/<joint_name>___ (struct, required)
 * [control_toolbox](http://wiki.ros.org/control_toolbox)::Pid for each controlled joint will be initialized using these parameters
