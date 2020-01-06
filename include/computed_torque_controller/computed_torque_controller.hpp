@@ -38,6 +38,7 @@
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #include <boost/optional.hpp>
+#include <boost/pointer_cast.hpp>
 #include <boost/shared_ptr.hpp>
 
 namespace computed_torque_controller {
@@ -46,6 +47,9 @@ class ComputedTorqueController
     : public ci::MultiInterfaceController< hi::JointStateInterface, hi::EffortJointInterface > {
 private:
   struct ObservedJointInfo {
+    ObservedJointInfo() {}
+    virtual ~ObservedJointInfo() {}
+
     // [dynamics model]
     dd::Joint *model_joint;
     std::size_t id_in_model;
@@ -56,6 +60,9 @@ private:
   typedef boost::shared_ptr< const ObservedJointInfo > ObservedJointInfoConstPtr;
 
   struct ControlledJointInfo : public ObservedJointInfo {
+    ControlledJointInfo() {}
+    virtual ~ControlledJointInfo() {}
+
     // [position setpoint (input) from ROS topic]
     double pos_sp;
     rt::RealtimeBuffer< double > pos_sp_buf;
@@ -139,11 +146,9 @@ public:
 
       // allocate joint info (observed or observed-and-controlled)
       ObservedJointInfoPtr joint_info;
-      ControlledJointInfoPtr ctl_joint_info;
       const std::string joint_ns(controller_nh.resolveName(rn::append("joints", joint_name)));
       if (rp::has(joint_ns)) {
-        ctl_joint_info.reset(new ControlledJointInfo());
-        joint_info = ctl_joint_info;
+        joint_info.reset(new ControlledJointInfo());
       } else {
         joint_info.reset(new ObservedJointInfo());
       }
@@ -165,7 +170,8 @@ public:
       all_joints_.push_back(joint_info);
 
       // optional procedure for contolled joints
-      if (ctl_joint_info) {
+      if (const ControlledJointInfoPtr ctl_joint_info =
+              boost::dynamic_pointer_cast< ControlledJointInfo >(joint_info)) {
         // [info about position setpoint from ROS topic]
         // subscription
         ctl_joint_info->pos_sp_sub = controller_nh.subscribe< std_msgs::Float64 >(
