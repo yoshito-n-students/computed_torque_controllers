@@ -149,7 +149,7 @@ public:
       }
       // reset setpoint memory by present state
       info.prev_pos_sp = info.hw_state_handle.getPosition();
-      info.prev_vel_sp = info.hw_state_handle.getVelocity();
+      info.prev_vel_sp = 0.;
     }
   }
 
