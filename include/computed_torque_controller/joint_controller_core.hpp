@@ -201,26 +201,28 @@ public:
       // short ailias
       const ObservedJointInfo &info(joint.second);
       const std::size_t id(info.id_in_model);
+      const double dt(period.toSec());
       const double pos(info.hw_state_handle.getPosition());
       const double vel(info.hw_state_handle.getVelocity());
-      const double dt(period.toSec());
+      // const double acc(dt > 0. ? (vel - info.prev_vel) / dt : 0.);
 
       // use joint state forwarded by one time step as setpoints
       model_->setPosition(id, pos + vel * dt);
       model_->setVelocity(id, vel);
-      // model_->setAcceleration(id, dt > 0. ? (vel - info.prev_vel) / dt : 0.);
+      // model_->setAcceleration(id, acc);
       // info.prev_vel = vel;
     }
 
     // updated equations of motion
     const Eigen::MatrixXd &M(model_->getMassMatrix());
+    const Eigen::VectorXd ddqu(model_->getAccelerations() + u);
     const Eigen::VectorXd &Cg(model_->getCoriolisAndGravityForces());
 
     // set effort commands to the hardware
     BOOST_FOREACH (ControlledJointInfoMap::value_type &joint, ctl_joints_) {
       ControlledJointInfo &info(joint.second);
       const std::size_t id(info.id_in_model);
-      info.hw_eff_cmd_handle.setCommand(M.row(id) * u + Cg[id]);
+      info.hw_eff_cmd_handle.setCommand(M.row(id) * ddqu + Cg[id]);
     }
   }
 
