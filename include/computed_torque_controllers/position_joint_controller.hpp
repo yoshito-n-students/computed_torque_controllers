@@ -51,8 +51,8 @@ private:
     ros::Subscriber pos_cmd_sub;
     boost::optional< jli::PositionJointSaturationHandle > pos_cmd_sat_handle;
 
-    // previous setpoints
-    double prev_pos_sp, prev_vel_sp;
+    // previous setpoint
+    double prev_pos_sp;
   };
   typedef std::map< std::string, ControlledJointInfo > ControlledJointInfoMap;
 
@@ -151,13 +151,12 @@ public:
       }
       // reset setpoint memory by present state
       info.prev_pos_sp = info.hw_state_handle.getPosition();
-      info.prev_vel_sp = 0.;
     }
   }
 
   virtual void update(const ros::Time &time, const ros::Duration &period) {
     // calc pos/vel/acc setpoints from subscribed position commands
-    std::map< std::string, PosVelAcc > ctl_joint_setpoints;
+    std::map< std::string, PosVel > ctl_joint_setpoints;
     BOOST_FOREACH (ControlledJointInfoMap::value_type &joint, ctl_joints_) {
       const std::string &name(joint.first);
       ControlledJointInfo &info(joint.second);
@@ -168,14 +167,12 @@ public:
         info.pos_cmd_sat_handle->enforceLimits(period);
       }
       // setpoints as derivatives of (saturated) position command
-      PosVelAcc &sp(ctl_joint_setpoints[name]);
+      PosVel &sp(ctl_joint_setpoints[name]);
       const double dt(period.toSec());
       sp.pos = info.pos_cmd;
       sp.vel = (dt > 0. ? (sp.pos - info.prev_pos_sp) / dt : 0.);
-      sp.acc = (dt > 0. ? (sp.vel - info.prev_vel_sp) / dt : 0.);
       // remember this setpoint for the next control step
       info.prev_pos_sp = sp.pos;
-      info.prev_vel_sp = sp.vel;
     }
 
     // update the backend

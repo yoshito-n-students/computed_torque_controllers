@@ -32,8 +32,8 @@ namespace computed_torque_controllers {
 
 // ================================================================
 // convenient struct to represent setpoint for a 1-DoF joint
-struct PosVelAcc {
-  double pos, vel, acc;
+struct PosVel {
+  double pos, vel;
 };
 
 // =========================================================
@@ -168,7 +168,7 @@ public:
   }
 
   void update(const ros::Time &time, const ros::Duration &period,
-              const std::map< std::string, PosVelAcc > &ctl_joint_setpoints) {
+              const std::map< std::string, PosVel > &ctl_joint_setpoints) {
     // match controlled joint names
     BOOST_FOREACH (const ControlledJointInfoMap::value_type &joint, ctl_joints_) {
       const std::string &name(joint.first);
@@ -204,7 +204,7 @@ public:
     BOOST_FOREACH (const ControlledJointInfoMap::value_type &joint, ctl_joints_) {
       // short ailias
       ControlledJointInfo &info(*joint.second);
-      const PosVelAcc &sp(ctl_joint_setpoints.find(joint.first)->second);
+      const PosVel &sp(ctl_joint_setpoints.find(joint.first)->second);
 
       // compute control input based on tracking errors
       u[info.id_in_model] =
