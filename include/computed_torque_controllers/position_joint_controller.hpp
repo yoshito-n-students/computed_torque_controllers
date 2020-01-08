@@ -139,6 +139,8 @@ public:
   }
 
   virtual void starting(const ros::Time &time) {
+    controller_core_.starting(time);
+
     BOOST_FOREACH (ControlledJointInfoMap::value_type &ctl_joint, ctl_joints_) {
       ControlledJointInfo &info(ctl_joint.second);
       // reset position command by present position
@@ -180,10 +182,7 @@ public:
     controller_core_.update(time, period, ctl_joint_setpoints);
   }
 
-  virtual void stopping(const ros::Time &time) {
-    // nothing to do
-    // (or set effort commands with zero control input??)
-  }
+  virtual void stopping(const ros::Time &time) { controller_core_.stopping(time); }
 
 private:
   static void positionCommandCB(const std_msgs::Float64ConstPtr &msg,
