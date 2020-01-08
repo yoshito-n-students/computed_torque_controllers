@@ -53,6 +53,7 @@ private:
     std::size_t id_in_model;
     // state from the hardware
     hi::JointStateHandle hw_state_handle;
+    double prev_vel;
   };
   typedef std::map< std::string, ObservedJointInfo > ObservedJointInfoMap;
 
@@ -156,6 +157,10 @@ public:
       // reset PID controllers
       joint.second.pid.reset();
     }
+    BOOST_FOREACH (ObservedJointInfoMap::value_type &joint, obs_joints_) {
+      ObservedJointInfo &info(joint.second);
+      info.prev_vel = info.hw_state_handle.getVelocity();
+    }
   }
 
   void update(const ros::Time &time, const ros::Duration &period,
@@ -176,6 +181,8 @@ public:
     model_root_joint_->setTransform(Eigen::Isometry3d::Identity());
     model_root_joint_->setLinearVelocity(Eigen::Vector3d::Zero());
     model_root_joint_->setAngularVelocity(Eigen::Vector3d::Zero());
+    model_root_joint_->setLinearAcceleration(Eigen::Vector3d::Zero());
+    model_root_joint_->setAngularAcceleration(Eigen::Vector3d::Zero());
 
     // update controlled joints in the model by the given setpoints
     Eigen::VectorXd u(Eigen::VectorXd::Zero(model_->getNumDofs()));
@@ -197,20 +204,20 @@ public:
     }
 
     // update observed joints in the model by the hardware state
-    BOOST_FOREACH (const ObservedJointInfoMap::value_type &joint, obs_joints_) {
+    BOOST_FOREACH (ObservedJointInfoMap::value_type &joint, obs_joints_) {
       // short ailias
-      const ObservedJointInfo &info(joint.second);
+      ObservedJointInfo &info(joint.second);
       const std::size_t id(info.id_in_model);
       const double dt(period.toSec());
       const double pos(info.hw_state_handle.getPosition());
       const double vel(info.hw_state_handle.getVelocity());
-      // const double acc(dt > 0. ? (vel - info.prev_vel) / dt : 0.);
+      const double acc(dt > 0. ? (vel - info.prev_vel) / dt : 0.);
 
       // use joint state forwarded by one time step as setpoints
       model_->setPosition(id, pos + vel * dt);
       model_->setVelocity(id, vel);
-      // model_->setAcceleration(id, acc);
-      // info.prev_vel = vel;
+      model_->setAcceleration(id, acc);
+      info.prev_vel = vel;
     }
 
     // updated equations of motion
