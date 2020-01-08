@@ -29,6 +29,7 @@
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #include <boost/optional.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace computed_torque_controller {
 
@@ -42,7 +43,11 @@ private:
 
     // position command subscription
     double pos_cmd;
-    rt::RealtimeBuffer< double > pos_cmd_buf;
+    // in kinetic, rt::RealtimeBuffer<> does not have a const copy constructor
+    //   --> ControlledJointInfo cannot have a const copy constructor
+    //   --> BOOST_FOREACH(ControlledJointInfo::value_type &v, ctl_joints) does not compile
+    // boost::shared_ptr<> is workaround to enable a const copy constructor
+    boost::shared_ptr< rt::RealtimeBuffer< double > > pos_cmd_buf;
     ros::Subscriber pos_cmd_sub;
     boost::optional< jli::PositionJointSaturationHandle > pos_cmd_sat_handle;
 
@@ -117,9 +122,10 @@ public:
       }
 
       // command subscription
+      info.pos_cmd_buf.reset(new rt::RealtimeBuffer< double >());
       info.pos_cmd_sub = controller_nh.subscribe< std_msgs::Float64 >(
           rn::append(name, "command"), 1,
-          boost::bind(&PositionJointController::positionCommandCB, _1, &info.pos_cmd_buf));
+          boost::bind(&PositionJointController::positionCommandCB, _1, info.pos_cmd_buf));
 
       // satulation based on limits (optional)
       jli::JointLimits limits;
@@ -136,7 +142,7 @@ public:
     BOOST_FOREACH (ControlledJointInfoMap::value_type &ctl_joint, ctl_joints_) {
       ControlledJointInfo &info(ctl_joint.second);
       // reset position command by present position
-      info.pos_cmd_buf.writeFromNonRT(info.hw_state_handle.getPosition());
+      info.pos_cmd_buf->writeFromNonRT(info.hw_state_handle.getPosition());
       // reset stateful command saturation handle
       if (info.pos_cmd_sat_handle) {
         info.pos_cmd_sat_handle->reset();
@@ -154,7 +160,7 @@ public:
       const std::string &name(joint.first);
       ControlledJointInfo &info(joint.second);
       // copy position setpoint from the buffer
-      info.pos_cmd = *info.pos_cmd_buf.readFromRT();
+      info.pos_cmd = *info.pos_cmd_buf->readFromRT();
       // satualate the command. below may modify info.pos_cmd according to the joint limit
       if (info.pos_cmd_sat_handle) {
         info.pos_cmd_sat_handle->enforceLimits(period);
@@ -181,7 +187,7 @@ public:
 
 private:
   static void positionCommandCB(const std_msgs::Float64ConstPtr &msg,
-                                rt::RealtimeBuffer< double > *const buf) {
+                                const boost::shared_ptr< rt::RealtimeBuffer< double > > &buf) {
     buf->writeFromNonRT(msg->data);
   }
 
