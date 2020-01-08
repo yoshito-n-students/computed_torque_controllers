@@ -1,12 +1,12 @@
-#ifndef COMPUTED_TORQUE_CONTROLLER_JOINT_CONTROLLER_CORE_HPP
-#define COMPUTED_TORQUE_CONTROLLER_JOINT_CONTROLLER_CORE_HPP
+#ifndef COMPUTED_TORQUE_CONTROLLERS_JOINT_CONTROLLER_CORE_HPP
+#define COMPUTED_TORQUE_CONTROLLERS_JOINT_CONTROLLER_CORE_HPP
 
 #include <map>
 #include <memory>
 #include <string>
 
-#include <computed_torque_controller/common_namespaces.hpp>
-#include <computed_torque_controller/ros_package_resource_retriever.hpp>
+#include <computed_torque_controllers/common_namespaces.hpp>
+#include <computed_torque_controllers/ros_package_resource_retriever.hpp>
 #include <control_toolbox/pid.h>
 #include <hardware_interface/hardware_interface.h> // for HardwareInterfaceException
 #include <hardware_interface/joint_command_interface.h>
@@ -26,7 +26,7 @@
 
 #include <boost/foreach.hpp>
 
-namespace computed_torque_controller {
+namespace computed_torque_controllers {
 
 // ================================================================
 // convenient struct to represent setpoint for a 1-DoF joint
@@ -245,6 +245,6 @@ private:
   std::map< std::string, ObservedJointInfo > obs_joints_;
 };
 
-} // namespace computed_torque_controller
+} // namespace computed_torque_controllers
 
 #endif

@@ -1,15 +1,15 @@
-#ifndef COMPUTED_TORQUE_CONTROLLER_ROS_PACKAGE_RESOURCE_RETRIEVER_HPP
-#define COMPUTED_TORQUE_CONTROLLER_ROS_PACKAGE_RESOURCE_RETRIEVER_HPP
+#ifndef COMPUTED_TORQUE_CONTROLLERS_ROS_PACKAGE_RESOURCE_RETRIEVER_HPP
+#define COMPUTED_TORQUE_CONTROLLERS_ROS_PACKAGE_RESOURCE_RETRIEVER_HPP
 
 #include <string>
 
-#include <computed_torque_controller/common_namespaces.hpp>
+#include <computed_torque_controllers/common_namespaces.hpp>
 #include <ros/console.h>
 #include <ros/package.h>
 
 #include <dart/common/LocalResourceRetriever.hpp>
 
-namespace computed_torque_controller {
+namespace computed_torque_controllers {
 
 // Resolver for URIs in URDF files. Currently supports file or package scheme URIs.
 // (ex. "file:/path" or "package://my_robot_description/meshes/body.dae")
@@ -77,6 +77,6 @@ public:
   }
 };
 
-} // namespace computed_torque_controller
+} // namespace computed_torque_controllers
 
 #endif

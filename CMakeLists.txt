@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(computed_torque_controller)
+project(computed_torque_controllers)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -118,7 +118,7 @@ unset(TINYXML2_INCLUDE_DIRS CACHE)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES computed_torque_controller
+  LIBRARIES computed_torque_controllers
   CATKIN_DEPENDS 
     controller_interface 
     control_toolbox 
@@ -147,15 +147,15 @@ include_directories(
 
 ## Declare a C++ library
 add_library(
-  computed_torque_controller
-  src/computed_torque_controller.cpp
+  computed_torque_controllers
+  src/computed_torque_controllers.cpp
 )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
 add_dependencies(
-  computed_torque_controller
+  computed_torque_controllers
   ${${PROJECT_NAME}_EXPORTED_TARGETS} 
   ${catkin_EXPORTED_TARGETS}
 )
@@ -184,7 +184,7 @@ add_dependencies(
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(
-  computed_torque_controller
+  computed_torque_controllers
   ${catkin_LIBRARIES}
   ${DART_LIBRARIES}
 )
@@ -241,7 +241,7 @@ target_link_libraries(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_computed_torque_controller.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_computed_torque_controllers.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

@@ -1,5 +1,5 @@
-#ifndef COMPUTED_TORQUE_CONTROLLER_COMMON_NAMESPACES_HPP
-#define COMPUTED_TORQUE_CONTROLLER_COMMON_NAMESPACES_HPP
+#ifndef COMPUTED_TORQUE_CONTROLLERS_COMMON_NAMESPACES_HPP
+#define COMPUTED_TORQUE_CONTROLLERS_COMMON_NAMESPACES_HPP
 
 namespace controller_interface {}
 
@@ -17,7 +17,7 @@ namespace joint_limits_interface {}
 
 namespace realtime_tools {}
 
-namespace computed_torque_controller {
+namespace computed_torque_controllers {
 namespace ci = controller_interface;
 namespace ct = control_toolbox;
 namespace dc = dart::common;

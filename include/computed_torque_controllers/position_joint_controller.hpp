@@ -1,12 +1,12 @@
-#ifndef COMPUTED_TORQUE_CONTROLLER_JOINT_POSITION_CONTROLLER_HPP
-#define COMPUTED_TORQUE_CONTROLLER_JOINT_POSITION_CONTROLLER_HPP
+#ifndef COMPUTED_TORQUE_CONTROLLERS_JOINT_POSITION_CONTROLLER_HPP
+#define COMPUTED_TORQUE_CONTROLLERS_JOINT_POSITION_CONTROLLER_HPP
 
 #include <limits>
 #include <map>
 #include <string>
 
-#include <computed_torque_controller/common_namespaces.hpp>
-#include <computed_torque_controller/joint_controller_core.hpp>
+#include <computed_torque_controllers/common_namespaces.hpp>
+#include <computed_torque_controllers/joint_controller_core.hpp>
 #include <controller_interface/multi_interface_controller.h>
 #include <hardware_interface/hardware_interface.h> // for HardwareInterfaceException
 #include <hardware_interface/joint_command_interface.h>
@@ -31,7 +31,7 @@
 #include <boost/optional.hpp>
 #include <boost/shared_ptr.hpp>
 
-namespace computed_torque_controller {
+namespace computed_torque_controllers {
 
 // controller frontend subscribing joint position commands & passing them to backend
 class PositionJointController
@@ -195,6 +195,6 @@ private:
   JointControllerCore controller_core_;
   ControlledJointInfoMap ctl_joints_;
 };
-} // namespace computed_torque_controller
+} // namespace computed_torque_controllers
 
 #endif

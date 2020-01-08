@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>computed_torque_controller</name>
+  <name>computed_torque_controllers</name>
   <version>0.0.2</version>
-  <description>The computed_torque_controller package</description>
+  <description>The computed_torque_controllers package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/computed_torque_controller</url> -->
+  <!-- <url type="website">http://wiki.ros.org/computed_torque_controllers</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->

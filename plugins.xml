@@ -1,7 +1,7 @@
-<library path="lib/libcomputed_torque_controller">
+<library path="lib/libcomputed_torque_controllers">
 
-  <class name="computed_torque_controller/PositionJointController" 
-         type="computed_torque_controller::PositionJointController" 
+  <class name="computed_torque_controllers/PositionJointController" 
+         type="computed_torque_controllers::PositionJointController" 
          base_class_type="controller_interface::ControllerBase">
     <description>
       This controller subscribes position command. 

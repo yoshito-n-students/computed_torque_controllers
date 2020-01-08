@@ -1,6 +1,6 @@
-# computed_torque_controller
+# computed_torque_controllers
 
-## computed_torque_controller/ComputedTorqueController
+## computed_torque_controllers/ComputedTorqueController
 ### <u>Formulation</u>
 The controller expects a general rigid body dynamics system, whose equations of motion are given in the form below.
 
@@ -36,7 +36,7 @@ ___<controller_namespace>/joints/<joint_name>___ (struct, required)
 ```
 # Parameter example
 computed_torque_conotroller:
-    type: computed_torque_controller/ComputedTorqueController
+    type: computed_torque_controllers/ComputedTorqueController
     joints:
         # Controlled joint 1
         joint_a:
@@ -54,7 +54,7 @@ computed_torque_conotroller:
 ```
 
 ### <u>Example</u>
-* [computed_torque_controller_example](https://github.com/yoshito-n-students/computed_torque_controller_example)
+* [computed_torque_controllers_example](https://github.com/yoshito-n-students/computed_torque_controllers_example)
 
 ### <u>Reference</u>
 * [Dart simulator's tutorial for manipulator control](https://dartsim.github.io/tutorials_manipulator.html#lesson-2c-write-a-stable-pd-controller-for-the-manipulator)
