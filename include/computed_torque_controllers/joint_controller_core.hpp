@@ -25,6 +25,8 @@
 #include <Eigen/Core>
 
 #include <boost/foreach.hpp>
+#include <boost/pointer_cast.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace computed_torque_controllers {
 
@@ -38,24 +40,25 @@ struct PosVelAcc {
 // core control implementation without command subscription
 class JointControllerCore {
 private:
-  struct ControlledJointInfo {
+  struct ObservedJointInfo {
+    virtual ~ObservedJointInfo() {}
+
     // mapping to dynamics model
     std::size_t id_in_model;
+    // state from the hardware
+    hi::JointStateHandle hw_state_handle;
+  };
+  typedef boost::shared_ptr< ObservedJointInfo > ObservedJointInfoPtr;
+  typedef std::map< std::string, ObservedJointInfoPtr > ObservedJointInfoMap;
+
+  struct ControlledJointInfo : public ObservedJointInfo {
     // effort command (output) to the hardware
     hi::JointHandle hw_eff_cmd_handle;
     // PID controller to generate effort command based on position error
     ct::Pid pid;
   };
-  typedef std::map< std::string, ControlledJointInfo > ControlledJointInfoMap;
-
-  struct ObservedJointInfo {
-    // mapping to dynamics model
-    std::size_t id_in_model;
-    // state from the hardware
-    hi::JointStateHandle hw_state_handle;
-    double prev_vel;
-  };
-  typedef std::map< std::string, ObservedJointInfo > ObservedJointInfoMap;
+  typedef boost::shared_ptr< ControlledJointInfo > ControlledJointInfoPtr;
+  typedef std::map< std::string, ControlledJointInfoPtr > ControlledJointInfoMap;
 
 public:
   JointControllerCore() {}
@@ -105,19 +108,35 @@ public:
         return false;
       }
 
-      // populate joint info
-      const std::map< std::string, std::string >::const_iterator ctl_joint_ns(
-          ctl_joint_namespaces.find(joint_name));
-      if (ctl_joint_ns != ctl_joint_namespaces.end()) {
-        // for a controlled joint
-        ControlledJointInfo &ctl_joint_info(ctl_joints_[joint_name]);
+      // allocate joint info according to joint types (observed or observed-and-controlled)
+      ObservedJointInfoPtr joint_info;
+      if (ctl_joint_namespaces.count(joint_name) == 0) {
+        joint_info.reset(new ObservedJointInfo());
+      } else {
+        joint_info.reset(new ControlledJointInfo());
+      }
 
-        // mapping to dynamics model
-        ctl_joint_info.id_in_model = model_joint->getIndexInSkeleton(/* 1st DoF */ 0);
+      // mapping to dynamics model
+      joint_info->id_in_model = model_joint->getIndexInSkeleton(/* 1st DoF */ 0);
 
+      // info about hardware joint state handle
+      try {
+        joint_info->hw_state_handle = hw_state_iface.getHandle(joint_name);
+      } catch (const hi::HardwareInterfaceException &ex) {
+        ROS_ERROR_STREAM("JointControllerCore::init(): Failed to get the state handle of '"
+                         << joint_name << "': " << ex.what());
+        return false;
+      }
+
+      // save info as an observed joint
+      all_joints_[joint_name] = joint_info;
+
+      // optional steps for a controlled joint
+      if (ControlledJointInfoPtr ctl_joint_info =
+              boost::dynamic_pointer_cast< ControlledJointInfo >(joint_info)) {
         // effort command to the hardware
         try {
-          ctl_joint_info.hw_eff_cmd_handle = hw_eff_cmd_iface.getHandle(joint_name);
+          ctl_joint_info->hw_eff_cmd_handle = hw_eff_cmd_iface.getHandle(joint_name);
         } catch (const hi::HardwareInterfaceException &ex) {
           ROS_ERROR_STREAM(
               "JointControllerCore::init(): Failed to get the effort command handle of '"
@@ -126,26 +145,15 @@ public:
         }
 
         // PID controller to generate effort command based on position error
-        if (!ctl_joint_info.pid.initParam(ctl_joint_ns->second)) {
+        const std::string &ctl_joint_ns(ctl_joint_namespaces.find(joint_name)->second);
+        if (!ctl_joint_info->pid.initParam(ctl_joint_ns)) {
           ROS_ERROR_STREAM("JointControllerCore::init(): Failed to init a PID by param '"
-                           << ctl_joint_ns->second << "'");
+                           << ctl_joint_ns << "'");
           return false;
         }
-      } else {
-        // for an observed joint
-        ObservedJointInfo &obs_joint_info(obs_joints_[joint_name]);
 
-        // mapping to dynamics model
-        obs_joint_info.id_in_model = model_joint->getIndexInSkeleton(/* 1st DoF */ 0);
-
-        // info about hardware joint state handle
-        try {
-          obs_joint_info.hw_state_handle = hw_state_iface.getHandle(joint_name);
-        } catch (const hi::HardwareInterfaceException &ex) {
-          ROS_ERROR_STREAM("JointControllerCore::init(): Failed to get the state handle of '"
-                           << joint_name << "': " << ex.what());
-          return false;
-        }
+        // save info as a controlled joint
+        ctl_joints_[joint_name] = ctl_joint_info;
       }
     }
 
@@ -153,13 +161,9 @@ public:
   }
 
   void starting(const ros::Time &time) {
-    BOOST_FOREACH (ControlledJointInfoMap::value_type &joint, ctl_joints_) {
+    BOOST_FOREACH (const ControlledJointInfoMap::value_type &joint, ctl_joints_) {
       // reset PID controllers
-      joint.second.pid.reset();
-    }
-    BOOST_FOREACH (ObservedJointInfoMap::value_type &joint, obs_joints_) {
-      ObservedJointInfo &info(joint.second);
-      info.prev_vel = info.hw_state_handle.getVelocity();
+      joint.second->pid.reset();
     }
   }
 
@@ -181,55 +185,42 @@ public:
     model_root_joint_->setTransform(Eigen::Isometry3d::Identity());
     model_root_joint_->setLinearVelocity(Eigen::Vector3d::Zero());
     model_root_joint_->setAngularVelocity(Eigen::Vector3d::Zero());
-    model_root_joint_->setLinearAcceleration(Eigen::Vector3d::Zero());
-    model_root_joint_->setAngularAcceleration(Eigen::Vector3d::Zero());
 
-    // update controlled joints in the model by the given setpoints
-    Eigen::VectorXd u(Eigen::VectorXd::Zero(model_->getNumDofs()));
-    BOOST_FOREACH (ControlledJointInfoMap::value_type &joint, ctl_joints_) {
+    // update all joints in the model by the hardware state
+    BOOST_FOREACH (const ObservedJointInfoMap::value_type &joint, all_joints_) {
       // short ailias
-      const std::string &name(joint.first);
-      ControlledJointInfo &info(joint.second);
+      ObservedJointInfo &info(*joint.second);
       const std::size_t id(info.id_in_model);
-      const PosVelAcc &sp(ctl_joint_setpoints.find(name)->second);
-
-      // update model joints by given setpoints
-      model_->setPosition(id, sp.pos);
-      model_->setVelocity(id, sp.vel);
-      model_->setAcceleration(id, sp.acc);
-
-      // compute control input based on tracking errors
-      u[id] = info.pid.computeCommand(sp.pos - info.hw_eff_cmd_handle.getPosition(),
-                                      sp.vel - info.hw_eff_cmd_handle.getVelocity(), period);
-    }
-
-    // update observed joints in the model by the hardware state
-    BOOST_FOREACH (ObservedJointInfoMap::value_type &joint, obs_joints_) {
-      // short ailias
-      ObservedJointInfo &info(joint.second);
-      const std::size_t id(info.id_in_model);
-      const double dt(period.toSec());
       const double pos(info.hw_state_handle.getPosition());
       const double vel(info.hw_state_handle.getVelocity());
-      const double acc(dt > 0. ? (vel - info.prev_vel) / dt : 0.);
 
       // use joint state forwarded by one time step as setpoints
-      model_->setPosition(id, pos + vel * dt);
+      model_->setPosition(id, pos + vel * period.toSec());
       model_->setVelocity(id, vel);
-      model_->setAcceleration(id, acc);
-      info.prev_vel = vel;
+    }
+
+    // generate control input 'u' from tracking errors of controlled joints
+    Eigen::VectorXd u(Eigen::VectorXd::Zero(model_->getNumDofs()));
+    BOOST_FOREACH (const ControlledJointInfoMap::value_type &joint, ctl_joints_) {
+      // short ailias
+      ControlledJointInfo &info(*joint.second);
+      const PosVelAcc &sp(ctl_joint_setpoints.find(joint.first)->second);
+
+      // compute control input based on tracking errors
+      u[info.id_in_model] =
+          info.pid.computeCommand(sp.pos - info.hw_eff_cmd_handle.getPosition(),
+                                  sp.vel - info.hw_eff_cmd_handle.getVelocity(), period);
     }
 
     // updated equations of motion
     const Eigen::MatrixXd &M(model_->getMassMatrix());
-    const Eigen::VectorXd ddqu(model_->getAccelerations() + u);
     const Eigen::VectorXd &Cg(model_->getCoriolisAndGravityForces());
 
     // set effort commands to the hardware
-    BOOST_FOREACH (ControlledJointInfoMap::value_type &joint, ctl_joints_) {
-      ControlledJointInfo &info(joint.second);
+    BOOST_FOREACH (const ControlledJointInfoMap::value_type &joint, ctl_joints_) {
+      ControlledJointInfo &info(*joint.second);
       const std::size_t id(info.id_in_model);
-      info.hw_eff_cmd_handle.setCommand(M.row(id) * ddqu + Cg[id]);
+      info.hw_eff_cmd_handle.setCommand(M.row(id) * u + Cg[id]);
     }
   }
 
@@ -241,8 +232,8 @@ public:
 private:
   dd::SkeletonPtr model_;
   dd::FreeJoint *model_root_joint_;
-  std::map< std::string, ControlledJointInfo > ctl_joints_;
-  std::map< std::string, ObservedJointInfo > obs_joints_;
+  ObservedJointInfoMap all_joints_;
+  ControlledJointInfoMap ctl_joints_;
 };
 
 } // namespace computed_torque_controllers
