@@ -1,11 +1,12 @@
 <library path="lib/libcomputed_torque_controller">
 
-  <class name="computed_torque_controller/ComputedTorqueController" 
-         type="computed_torque_controller::ComputedTorqueController" 
+  <class name="computed_torque_controller/PositionJointController" 
+         type="computed_torque_controller::PositionJointController" 
          base_class_type="controller_interface::ControllerBase">
     <description>
       This controller subscribes position command. 
-      The controller expects a hardware_interface::EffortJointInterface as a hardware interface.
+      The controller expects a hardware_interface::EffortJointInterface for controlled joints
+      and a hardware_interface::JointStateInterface for all other joints as a hardware interface.
     </description>
   </class>
 
