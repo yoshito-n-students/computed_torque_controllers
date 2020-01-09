@@ -13,7 +13,7 @@ The controller computes the joint effort commands <img src="https://latex.codeco
 
 where <img src="https://latex.codecogs.com/gif.latex?\textup{PID}(\cdot)" /> is the control input to the system based on a PID controller for the position and velocity tracking errors.
 
-<img src="https://latex.codecogs.com/gif.latex?\textup{PID}(e,\dot{e})=K_pe+K_i\int edt+K_d\dot{e}" />
+<img src="https://latex.codecogs.com/gif.latex?\textup{PID}(e,\dot{e})=K_pe+K_i\int&space;edt+K_d\dot{e}" />
 
 ## Implementation
 * The equations of motion are build by using [dart](https://dartsim.github.io/dart/)::utils::DartLoader besed on given robot description parameter in URDF
@@ -34,9 +34,9 @@ This controller plugin subscribes position commands <img src="https://latex.code
 
 <img src="https://latex.codecogs.com/gif.latex?q_\textup{sp}=saturate(q_\textup{cmd})" />
 
-<img src="https://latex.codecogs.com/gif.latex?\dot{q}_\textup{sp}=\frac{q_\textup{sp}-q_\textup{sp,prev}}{\Delta t}" />
+<img src="https://latex.codecogs.com/gif.latex?\dot{q}_\textup{sp}=\frac{q_\textup{sp}-q_\textup{sp,prev}}{\Delta&space;t}" />
 
-where <img src="https://latex.codecogs.com/gif.latex?saturate(\cdot)" /> is a saturation function based on joint limits in robot description parameter, and <img src="https://latex.codecogs.com/gif.latex?\Delta t" /> is the control time step.
+where <img src="https://latex.codecogs.com/gif.latex?saturate(\cdot)" /> is a saturation function based on joint limits in robot description parameter, and <img src="https://latex.codecogs.com/gif.latex?\Delta&space;t" /> is the control time step.
 
 ### <u>Subscribed topics</u>
 ___<controller_namespace>/<joint_name>/command___ (std_msgs/Float64)
