@@ -1,26 +1,42 @@
 # computed_torque_controllers
 
-## computed_torque_controllers/ComputedTorqueController
-### <u>Formulation</u>
+## Formulation
 The controller expects a general rigid body dynamics system, whose equations of motion are given in the form below.
 
 <img src="https://latex.codecogs.com/gif.latex?M(q)\ddot{q}+C(q,\dot{q})+g(q)=\tau" />
 
 where <img src="https://latex.codecogs.com/gif.latex?q" />, <img src="https://latex.codecogs.com/gif.latex?M(\cdot)" />, <img src="https://latex.codecogs.com/gif.latex?C(\cdot)" />, and <img src="https://latex.codecogs.com/gif.latex?g(\cdot)" /> are the joint position vector, inertia matrix, Colioris vector, and gravity vector.
 
-The controller computes the joint effort commands <img src="https://latex.codecogs.com/gif.latex?\tau_d" /> to track the joint position setpoints <img src="https://latex.codecogs.com/gif.latex?q_{\textup{sp}}" /> with compensation for the inertia, Colioris, and gravity forces.
+The controller computes the joint effort commands <img src="https://latex.codecogs.com/gif.latex?\tau_d" /> to track the joint position setpoints <img src="https://latex.codecogs.com/gif.latex?q_{\textup{sp}}" /> and velocity setpoints <img src="https://latex.codecogs.com/gif.latex?\dot{q}_{\textup{sp}}" /> with compensation for the inertia, Colioris, and gravity forces.
 
-<img src="https://latex.codecogs.com/gif.latex?\tau_d=M(q)(\ddot{q}+\textup{PID}(q_{\textup{sp}}-q))+C(q,\dot{q})+g(q)" />
+<img src="https://latex.codecogs.com/gif.latex?\tau_d=M(q)(\ddot{q}+\textup{PID}(q_{\textup{sp}}-q,\dot{q}_{\textup{sp}}-\dot{q}))+C(q,\dot{q})+g(q)" />
 
-where <img src="https://latex.codecogs.com/gif.latex?\textup{PID}(\cdot)" /> is the control input to the system based on a PID controller for the position tracking errors.
+where <img src="https://latex.codecogs.com/gif.latex?\textup{PID}(\cdot)" /> is the control input to the system based on a PID controller for the position and velocity tracking errors.
 
-### <u>Prerequisites</u>
-* Robot description in URDF to build a dynamics model (using [dart](https://dartsim.github.io/dart/)::utils::DartLoader)
-* hardware_interface/JointStateHandle for all joints appeared in the model
-* hardware_interface/EffortJointHandle for controlled joints specified by the controller param
-* Tested environments
-  * Ubuntu 16.04 + ROS Kinetic + Dart 6.9.0 + Gazebo 7.16.0
-  * Ubuntu 18.04 + ROS Melodic + Dart 6.9.2 + Gazebo 9.11.0
+<img src="https://latex.codecogs.com/gif.latex?\textup{PID}(e,\dot{e})=K_pe+K_i\int edt+K_d\dot{e}" />
+
+## Implementation
+* The equations of motion are build by using [dart](https://dartsim.github.io/dart/)::utils::DartLoader besed on given robot description parameter in URDF
+* States of all joints are obtained from hardware_interface/JointStateHandle
+* Effort commands for controlled joints are written to hardware_interface/EffortJointHandle
+* PID controllers for controlled joints are based on control_toolbox::Pid
+
+## Tested environments
+* Ubuntu 16.04 + ROS Kinetic + Dart 6.9.0 + Gazebo 7.16.0
+* Ubuntu 18.04 + ROS Melodic + Dart 6.9.2 + Gazebo 9.11.0
+
+## Example
+* [computed_torque_controllers_example](https://github.com/yoshito-n-students/computed_torque_controllers_example)
+
+## Plugin: computed_torque_controllers/PositionJointController
+
+This controller plugin subscribes position commands <img src="https://latex.codecogs.com/gif.latex?q_\textup{cmd}" /> for controlled joints. Position and velocity setpoints are obtained as follows.
+
+<img src="https://latex.codecogs.com/gif.latex?q_\textup{sp}=saturate(q_\textup{cmd})" />
+
+<img src="https://latex.codecogs.com/gif.latex?\dot{q}_\textup{sp}=\frac{q_\textup{sp}-q_\textup{sp,prev}}{\Delta t}" />
+
+where <img src="https://latex.codecogs.com/gif.latex?saturate(\cdot)" /> is a saturation function based on joint limits in robot description parameter, and <img src="https://latex.codecogs.com/gif.latex?\Delta t" /> is the control time step.
 
 ### <u>Subscribed topics</u>
 ___<controller_namespace>/<joint_name>/command___ (std_msgs/Float64)
@@ -53,9 +69,6 @@ computed_torque_conotroller:
 # will be subscribed by the controller
 ```
 
-### <u>Example</u>
-* [computed_torque_controllers_example](https://github.com/yoshito-n-students/computed_torque_controllers_example)
-
-### <u>Reference</u>
+## Reference
 * [Dart simulator's tutorial for manipulator control](https://dartsim.github.io/tutorials_manipulator.html#lesson-2c-write-a-stable-pd-controller-for-the-manipulator)
 * [Gazebo simulator's GravityCompensationPlugin](https://bitbucket.org/osrf/gazebo/src/default/plugins/GravityCompensationPlugin.cc)
