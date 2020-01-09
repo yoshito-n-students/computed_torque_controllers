@@ -69,6 +69,16 @@ computed_torque_conotroller:
 # will be subscribed by the controller
 ```
 
+## Plugin: computed_torque_controllers/VelocityJointController
+
+This controller plugin subscribes velocity commands <img src="https://latex.codecogs.com/gif.latex?\dot{q}_\textup{cmd}" /> for controlled joints. Position and velocity setpoints are obtained as follows.
+
+<img src="https://latex.codecogs.com/gif.latex?q_\textup{sp}=q_\textup{sp,prev}+\dot{q}_\textup{sp}\Delta&space;t" />
+
+<img src="https://latex.codecogs.com/gif.latex?\dot{q}_\textup{sp}=\textup{saturate}(\dot{q}_\textup{cmd})" />
+
+Subscribed topics and paramters are same to PositionJointController.
+
 ## Reference
 * [Dart simulator's tutorial for manipulator control](https://dartsim.github.io/tutorials_manipulator.html#lesson-2c-write-a-stable-pd-controller-for-the-manipulator)
 * [Gazebo simulator's GravityCompensationPlugin](https://bitbucket.org/osrf/gazebo/src/default/plugins/GravityCompensationPlugin.cc)
