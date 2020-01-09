@@ -32,11 +32,11 @@ where <img src="https://latex.codecogs.com/gif.latex?\textup{PID}(\cdot)" /> is 
 
 This controller plugin subscribes position commands <img src="https://latex.codecogs.com/gif.latex?q_\textup{cmd}" /> for controlled joints. Position and velocity setpoints are obtained as follows.
 
-<img src="https://latex.codecogs.com/gif.latex?q_\textup{sp}=saturate(q_\textup{cmd})" />
+<img src="https://latex.codecogs.com/gif.latex?q_\textup{sp}=\textup{saturate}(q_\textup{cmd})" />
 
 <img src="https://latex.codecogs.com/gif.latex?\dot{q}_\textup{sp}=\frac{q_\textup{sp}-q_\textup{sp,prev}}{\Delta&space;t}" />
 
-where <img src="https://latex.codecogs.com/gif.latex?saturate(\cdot)" /> is a saturation function based on joint limits in robot description parameter, and <img src="https://latex.codecogs.com/gif.latex?\Delta&space;t" /> is the control time step.
+where <img src="https://latex.codecogs.com/gif.latex?\textup{saturate}(\cdot)" /> is a saturation function based on joint limits in robot description parameter, and <img src="https://latex.codecogs.com/gif.latex?\Delta&space;t" /> is the control time step.
 
 ### <u>Subscribed topics</u>
 ___<controller_namespace>/<joint_name>/command___ (std_msgs/Float64)
