@@ -36,8 +36,10 @@ struct PosVel {
   double pos, vel;
 };
 
-// =========================================================
+// ===========================================================================================
 // core control implementation without command subscription
+//   [ input] position and velocity setpoints of each controlled joint & states of all joints
+//   [output] effort commands to controlled joints
 class JointControllerCore {
 private:
   struct ObservedJointInfo {
@@ -54,7 +56,7 @@ private:
   struct ControlledJointInfo : public ObservedJointInfo {
     // effort command (output) to the hardware
     hi::JointHandle hw_eff_cmd_handle;
-    // PID controller to generate effort command based on position error
+    // PID controller to generate effort command based on tracking error
     ct::Pid pid;
   };
   typedef boost::shared_ptr< ControlledJointInfo > ControlledJointInfoPtr;
@@ -194,7 +196,8 @@ public:
       const double pos(info.hw_state_handle.getPosition());
       const double vel(info.hw_state_handle.getVelocity());
 
-      // use joint state forwarded by one time step as setpoints
+      // use joint state forwarded by one time step as setpoints for better control stability
+      // (recommended in https://dartsim.github.io/tutorials_manipulator.html)
       model_->setPosition(id, pos + vel * period.toSec());
       model_->setVelocity(id, vel);
     }
