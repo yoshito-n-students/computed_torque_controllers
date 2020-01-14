@@ -41,7 +41,7 @@ struct PosVel {
 //   [ input] position and velocity setpoints of each controlled joint & states of all joints
 //   [output] effort commands to controlled joints
 class JointControllerCore {
-private:
+protected:
   struct ObservedHardwareJoint {
     virtual ~ObservedHardwareJoint() {}
 
@@ -94,7 +94,7 @@ public:
     // (or set effort commands with zero control input??)
   }
 
-private:
+protected:
   // =======================================================================
   // initialize a robot dynamics model based on robot description in URDF
   bool initModel(const std::string &urdf_str) {
@@ -257,7 +257,7 @@ private:
     }
   }
 
-private:
+protected:
   dd::SkeletonPtr model_;
   dd::FreeJoint *model_root_joint_;
   ObservedHardwareJointMap all_hw_joints_;
