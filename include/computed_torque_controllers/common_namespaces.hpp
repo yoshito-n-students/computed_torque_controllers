@@ -8,6 +8,7 @@ namespace control_toolbox {}
 namespace dart {
 namespace common {}
 namespace dynamics {}
+namespace math {}
 namespace utils {}
 } // namespace dart
 
@@ -22,10 +23,11 @@ namespace ci = controller_interface;
 namespace ct = control_toolbox;
 namespace dc = dart::common;
 namespace dd = dart::dynamics;
+namespace dm = dart::math;
 namespace du = dart::utils;
 namespace hi = hardware_interface;
 namespace jli = joint_limits_interface;
 namespace rt = realtime_tools;
-} // namespace computed_torque_controller
+} // namespace computed_torque_controllers
 
 #endif
