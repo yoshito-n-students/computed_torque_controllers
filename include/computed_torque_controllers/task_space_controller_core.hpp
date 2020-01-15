@@ -1,5 +1,5 @@
-#ifndef COMPUTED_TORQUE_CONTROLLERS_OPERATIONAL_SPACE_CONTROLLER_CORE_HPP
-#define COMPUTED_TORQUE_CONTROLLERS_OPERATIONAL_SPACE_CONTROLLER_CORE_HPP
+#ifndef COMPUTED_TORQUE_CONTROLLERS_TASK_SPACE_CONTROLLER_CORE_HPP
+#define COMPUTED_TORQUE_CONTROLLERS_TASK_SPACE_CONTROLLER_CORE_HPP
 
 #include <map>
 #include <string>
@@ -24,11 +24,11 @@ namespace computed_torque_controllers {
 // core control implementation without command subscription
 //   [ input] position and velocity setpoints of each controlled joint & states of all joints
 //   [output] effort commands to controlled joints
-class OperationalSpaceControllerCore : protected JointControllerCore {
+class TaskSpaceControllerCore : protected JointControllerCore {
 public:
-  OperationalSpaceControllerCore() {}
+  TaskSpaceControllerCore() {}
 
-  virtual ~OperationalSpaceControllerCore() {}
+  virtual ~TaskSpaceControllerCore() {}
 
   bool init(const std::string &urdf_str, hi::RobotHW *const hw,
             const std::map< /* controlled joint name */ std::string,
@@ -69,7 +69,7 @@ protected:
     for (std::size_t i = 0; i < 3; ++i) {
       if (!pids_[i].initParam(linear_dof_ns)) {
         ROS_ERROR_STREAM(
-            "OperationalSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
+            "TaskSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
             << linear_dof_ns << "'");
         return false;
       }
@@ -77,7 +77,7 @@ protected:
     for (std::size_t i = 3; i < 6; ++i) {
       if (!pids_[i].initParam(angular_dof_ns)) {
         ROS_ERROR_STREAM(
-            "OperationalSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
+            "TaskSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
             << angular_dof_ns << "'");
         return false;
       }
@@ -109,7 +109,7 @@ protected:
     // convert reference velocity from task to joint spaces
     std::map< std::string, PosVel > ctl_joint_setpoints;
     BOOST_FOREACH (const ControlledHardwareJointMap::value_type &joint_val, ctl_hw_joints_) {
-      const std::string name(joint_val.first);
+      const std::string &name(joint_val.first);
       const ControlledHardwareJoint &joint(*joint_val.second);
       const std::size_t id(joint.id_in_model);
 
