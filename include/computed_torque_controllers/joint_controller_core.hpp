@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <computed_torque_controllers/common_namespaces.hpp>
 #include <computed_torque_controllers/ros_package_resource_retriever.hpp>
@@ -12,10 +13,13 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
+#include <joint_limits_interface/joint_limits.h>
+#include <joint_limits_interface/joint_limits_interface.h>
+#include <joint_limits_interface/joint_limits_urdf.h>
 #include <ros/console.h>
 #include <ros/duration.h>
 #include <ros/node_handle.h>
-#include <ros/time.h>
+#include <urdf/model.h>
 
 #include <dart/dynamics/FreeJoint.hpp>
 #include <dart/dynamics/Joint.hpp>
@@ -25,16 +29,11 @@
 #include <Eigen/Core>
 
 #include <boost/foreach.hpp>
+#include <boost/optional.hpp>
 #include <boost/pointer_cast.hpp>
 #include <boost/shared_ptr.hpp>
 
 namespace computed_torque_controllers {
-
-// ================================================================
-// convenient struct to represent setpoint for a 1-DoF joint
-struct PosVel {
-  double pos, vel;
-};
 
 // ===========================================================================================
 // core control implementation without command subscription
@@ -58,6 +57,10 @@ protected:
     hi::JointHandle eff_cmd_handle;
     // PID controller to generate effort command based on tracking error
     ct::Pid pid;
+    // setpoints and saturation handles
+    double pos_sp, vel_sp, prev_pos_sp;
+    boost::optional< jli::PositionJointSaturationHandle > pos_sp_sat_handle;
+    boost::optional< jli::VelocityJointSaturationHandle > vel_sp_sat_handle;
   };
   typedef boost::shared_ptr< ControlledHardwareJoint > ControlledHardwareJointPtr;
   typedef std::map< std::string, ControlledHardwareJointPtr > ControlledHardwareJointMap;
@@ -67,35 +70,102 @@ public:
 
   virtual ~JointControllerCore() {}
 
-  // ============================================================================================
-  bool init(const std::string &urdf_str, hi::RobotHW *const hw,
-            const std::map< /* controlled joint name */ std::string,
-                            /* joint-specific param ns */ std::string > &ctl_joint_namespaces) {
-    return initModel(urdf_str) && initHardware(hw, ctl_joint_namespaces);
+  // ===========================================================
+  bool init(hi::RobotHW *const hw, ros::NodeHandle &param_nh) {
+    // get robot description in URDF from param,
+    // which is required to initialize the model & hardware
+    std::string urdf_str;
+    if (!param_nh.getParam("robot_description", urdf_str) &&
+        !ros::param::get("robot_description", urdf_str)) {
+      ROS_ERROR_STREAM("JointControllerCore::init(): Faild to get robot description from '"
+                       << param_nh.resolveName("robot_description") << "' nor '"
+                       << ros::names::resolve("robot_description") << "'");
+      return false;
+    }
+
+    return initModel(urdf_str) && initHardware(urdf_str, hw, param_nh);
   }
 
-  // =====================================================================================
-  void starting(const ros::Time &time) {
-    BOOST_FOREACH (const ControlledHardwareJointMap::value_type &joint, ctl_hw_joints_) {
-      joint.second->pid.reset();
+  // ===============
+  void starting() {
+    BOOST_FOREACH (const ControlledHardwareJointMap::value_type &joint_val, ctl_hw_joints_) {
+      const ControlledHardwareJointPtr &joint(joint_val.second);
+      joint->pid.reset();
+      joint->prev_pos_sp = joint->state_handle.getPosition();
     }
   }
 
-  // =======================================================================
-  void update(const ros::Time &time, const ros::Duration &period,
-              const std::map< std::string, PosVel > &ctl_joint_setpoints) {
+  // ============================================================================================
+  void update(const ros::Duration &period, const std::map< std::string, double > &pos_setpoints,
+              const std::map< std::string, double > &vel_setpoints) {
+    // saturate given setpoints
+    BOOST_FOREACH (const ControlledHardwareJointMap::value_type &joint_val, ctl_hw_joints_) {
+      const std::string &name(joint_val.first);
+      const ControlledHardwareJointPtr joint(joint_val.second);
+
+      const double *const pos_sp(findValue(pos_setpoints, name));
+      const double *const vel_sp(findValue(vel_setpoints, name));
+
+      if (pos_sp && vel_sp) {
+        // TODO: better integration of pos & vel setpoints
+        joint->pos_sp = *pos_sp;
+        if (joint->pos_sp_sat_handle) {
+          joint->pos_sp_sat_handle->enforceLimits(period);
+        }
+        joint->vel_sp = *vel_sp;
+        if (joint->vel_sp_sat_handle) {
+          joint->vel_sp_sat_handle->enforceLimits(period);
+        }
+      } else if (pos_sp && !vel_sp) {
+        joint->pos_sp = *pos_sp;
+        if (joint->pos_sp_sat_handle) {
+          joint->pos_sp_sat_handle->enforceLimits(period);
+        }
+        const double dt(period.toSec());
+        joint->vel_sp = dt > 0. ? (joint->pos_sp - joint->prev_pos_sp) / dt : 0.;
+        if (joint->vel_sp_sat_handle) {
+          joint->vel_sp_sat_handle->enforceLimits(period);
+        }
+      } else if (!pos_sp && vel_sp) {
+        joint->vel_sp = *vel_sp;
+        if (joint->vel_sp_sat_handle) {
+          joint->vel_sp_sat_handle->enforceLimits(period);
+        }
+        joint->pos_sp = joint->prev_pos_sp + joint->vel_sp * period.toSec();
+        if (joint->pos_sp_sat_handle) {
+          joint->pos_sp_sat_handle->enforceLimits(period);
+        }
+      } else if (!pos_sp && !vel_sp) {
+        joint->pos_sp = joint->prev_pos_sp;
+        joint->vel_sp = 0.;
+      } else {
+        ROS_ERROR("JointControllerCore::update(): Bug...");
+      }
+
+      joint->prev_pos_sp = joint->pos_sp;
+    }
+
     updateModel(period);
-    updateHardware(period, ctl_joint_setpoints);
+    updateHardware(period);
   }
 
-  // ====================================
-  void stopping(const ros::Time &time) {
+  // ===============
+  void stopping() {
     // nothing to do
     // (or set effort commands with zero control input??)
   }
 
+  // ==========================================================
+  std::vector< std::string > getControlledJointNames() const {
+    std::vector< std::string > names;
+    BOOST_FOREACH (const ControlledHardwareJointMap::value_type &joint, ctl_hw_joints_) {
+      names.push_back(joint.first);
+    }
+    return names;
+  }
+
 protected:
-  // =======================================================================
+  // =====================================================================
   // initialize a robot dynamics model based on robot description in URDF
   bool initModel(const std::string &urdf_str) {
     model_ = du::DartLoader().parseSkeletonString(
@@ -122,8 +192,15 @@ protected:
 
   // ======================================================================
   // initialize hardware joints. this cannot be called before initModel().
-  bool initHardware(hi::RobotHW *const hw,
-                    const std::map< std::string, std::string > &ctl_joint_namespaces) {
+  bool initHardware(const std::string &urdf_str, hi::RobotHW *const hw, ros::NodeHandle &param_nh) {
+    // parse robot description to extract joint names & limits
+    urdf::Model robot_desc;
+    if (!robot_desc.initString(urdf_str)) {
+      ROS_ERROR(
+          "JointControllerCore::initHardware(): Failed to parse robot description as an URDF");
+      return false;
+    }
+
     // required hardware interfaces
     hi::JointStateInterface &state_iface(*hw->get< hi::JointStateInterface >());
     hi::EffortJointInterface &eff_cmd_iface(*hw->get< hi::EffortJointInterface >());
@@ -146,7 +223,8 @@ protected:
 
       // allocate joint info according to joint types (observed or observed-and-controlled)
       ObservedHardwareJointPtr joint;
-      if (ctl_joint_namespaces.count(name) == 0) {
+      const std::string ctl_joint_ns(param_nh.resolveName(ros::names::append("joints", name)));
+      if (ros::param::has(ctl_joint_ns)) {
         joint.reset(new ObservedHardwareJoint());
       } else {
         joint.reset(new ControlledHardwareJoint());
@@ -180,11 +258,19 @@ protected:
         }
 
         // PID controller to generate effort command based on position error
-        const std::string &ctl_joint_ns(ctl_joint_namespaces.find(name)->second);
         if (!ctl_joint->pid.initParam(ctl_joint_ns)) {
           ROS_ERROR_STREAM("JointControllerCore::initHardware(): Failed to init a PID by param '"
                            << ctl_joint_ns << "'");
           return false;
+        }
+
+        // load joint limits from robot description if limits exist
+        jli::JointLimits limits;
+        if (jli::getJointLimits(robot_desc.getJoint(name), limits)) {
+          ctl_joint->pos_sp_sat_handle = jli::PositionJointSaturationHandle(
+              hi::JointHandle(ctl_joint->state_handle, &ctl_joint->pos_sp), limits);
+          ctl_joint->vel_sp_sat_handle = jli::VelocityJointSaturationHandle(
+              hi::JointHandle(ctl_joint->state_handle, &ctl_joint->vel_sp), limits);
         }
 
         ctl_hw_joints_[name] = ctl_joint;
@@ -221,28 +307,15 @@ protected:
   // ===================================================================
   // update the hardware joints by writing effort commands.
   // this expects the dynamics model has been updated by updateModel().
-  void updateHardware(const ros::Duration &period,
-                      const std::map< std::string, PosVel > &ctl_joint_setpoints) {
+  void updateHardware(const ros::Duration &period) {
     // generate control input 'u' from tracking errors of controlled joints
     Eigen::VectorXd u(Eigen::VectorXd::Zero(model_->getNumDofs()));
     BOOST_FOREACH (const ControlledHardwareJointMap::value_type &joint_val, ctl_hw_joints_) {
-      const std::string &name(joint_val.first);
-      const std::map< std::string, PosVel >::const_iterator sp_it(ctl_joint_setpoints.find(name));
-      if (sp_it == ctl_joint_setpoints.end()) {
-        ROS_ERROR_STREAM(
-            "JointControllerCore::updateHardware(): No setpoint for the controlled joint '" << name
-                                                                                            << "'");
-        continue;
-      }
-
-      // short ailias
-      ControlledHardwareJoint &joint(*joint_val.second);
-      const PosVel &sp(sp_it->second);
-
       // compute control input based on tracking errors
+      ControlledHardwareJoint &joint(*joint_val.second);
       u[joint.id_in_model] =
-          joint.pid.computeCommand(sp.pos - joint.state_handle.getPosition(),
-                                   sp.vel - joint.state_handle.getVelocity(), period);
+          joint.pid.computeCommand(joint.pos_sp - joint.state_handle.getPosition(),
+                                   joint.vel_sp - joint.state_handle.getVelocity(), period);
     }
 
     // equations of motion
@@ -255,6 +328,20 @@ protected:
       const std::size_t id(joint.id_in_model);
       joint.eff_cmd_handle.setCommand(M.row(id) * u + Cg[id]);
     }
+  }
+
+  // ================================================================================
+  // utility functions to find a value corresponding the given key in the given map.
+  // returns the pointer of value if found, or NULL.
+  template < typename Key, typename Value >
+  static Value *findValue(std::map< Key, Value > &val_map, const Key &key) {
+    const typename std::map< Key, Value >::iterator it(val_map.find(key));
+    return it != val_map.end() ? &it->second : NULL;
+  }
+  template < typename Key, typename Value >
+  static const Value *findValue(const std::map< Key, Value > &val_map, const Key &key) {
+    const typename std::map< Key, Value >::const_iterator it(val_map.find(key));
+    return it != val_map.end() ? &it->second : NULL;
   }
 
 protected:
