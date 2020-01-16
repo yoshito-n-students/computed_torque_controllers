@@ -111,36 +111,19 @@ public:
 
       if (pos_sp && vel_sp) {
         // TODO: better integration of pos & vel setpoints
-        joint->pos_sp = *pos_sp;
-        if (joint->pos_sp_sat_handle) {
-          joint->pos_sp_sat_handle->enforceLimits(period);
-        }
-        joint->vel_sp = *vel_sp;
-        if (joint->vel_sp_sat_handle) {
-          joint->vel_sp_sat_handle->enforceLimits(period);
-        }
+        updatePositionSetpoint(joint, *pos_sp, period);
+        updateVelocitySetpoint(joint, *vel_sp, period);
       } else if (pos_sp && !vel_sp) {
-        joint->pos_sp = *pos_sp;
-        if (joint->pos_sp_sat_handle) {
-          joint->pos_sp_sat_handle->enforceLimits(period);
-        }
+        updatePositionSetpoint(joint, *pos_sp, period);
         const double dt(period.toSec());
-        joint->vel_sp = dt > 0. ? (joint->pos_sp - joint->prev_pos_sp) / dt : 0.;
-        if (joint->vel_sp_sat_handle) {
-          joint->vel_sp_sat_handle->enforceLimits(period);
-        }
+        updateVelocitySetpoint(joint, dt > 0. ? (joint->pos_sp - joint->prev_pos_sp) / dt : 0.,
+                               period);
       } else if (!pos_sp && vel_sp) {
-        joint->vel_sp = *vel_sp;
-        if (joint->vel_sp_sat_handle) {
-          joint->vel_sp_sat_handle->enforceLimits(period);
-        }
-        joint->pos_sp = joint->prev_pos_sp + joint->vel_sp * period.toSec();
-        if (joint->pos_sp_sat_handle) {
-          joint->pos_sp_sat_handle->enforceLimits(period);
-        }
+        updateVelocitySetpoint(joint, *vel_sp, period);
+        updatePositionSetpoint(joint, joint->prev_pos_sp + joint->vel_sp * period.toSec(), period);
       } else if (!pos_sp && !vel_sp) {
-        joint->pos_sp = joint->prev_pos_sp;
-        joint->vel_sp = 0.;
+        updatePositionSetpoint(joint, joint->prev_pos_sp, period);
+        updateVelocitySetpoint(joint, 0., period);
       } else {
         ROS_ERROR("JointControllerCore::update(): Bug...");
       }
@@ -281,6 +264,23 @@ protected:
     }
 
     return true;
+  }
+
+  // ==========================================================================================
+  // frequent procedures to update setpoint of a joint; set value & apply limits.
+  static void updatePositionSetpoint(const ControlledHardwareJointPtr &joint, const double sp,
+                                     const ros::Duration &period) {
+    joint->pos_sp = sp;
+    if (joint->pos_sp_sat_handle) {
+      joint->pos_sp_sat_handle->enforceLimits(period);
+    }
+  }
+  static void updateVelocitySetpoint(const ControlledHardwareJointPtr &joint, const double sp,
+                                     const ros::Duration &period) {
+    joint->vel_sp = sp;
+    if (joint->vel_sp_sat_handle) {
+      joint->vel_sp_sat_handle->enforceLimits(period);
+    }
   }
 
   // ==========================================================
