@@ -67,7 +67,7 @@ protected:
     end_link_offset_ = Eigen::Vector3d::Zero();
 
     // load PIDs if gains are specified. this is an optional step
-    // because PIDs are not required when only velocity setpoints are given.
+    // because PIDs are not required unless position setpoints are given.
     const std::string linear_ns(param_nh.resolveName(rn::append("task_space", "linear")));
     if (rp::has(rn::append(linear_ns, "p"))) {
       if (!pids_["linear_x"].initParam(linear_ns) || !pids_["linear_y"].initParam(linear_ns) ||
@@ -78,7 +78,7 @@ protected:
       }
     }
     const std::string angular_ns(param_nh.resolveName(rn::append("task_space", "angular")));
-    if (rp::has(rn::append(linear_ns, "p"))) {
+    if (rp::has(rn::append(angular_ns, "p"))) {
       if (!pids_["angular_x"].initParam(angular_ns) || !pids_["angular_y"].initParam(angular_ns) ||
           !pids_["angular_z"].initParam(angular_ns)) {
         ROS_ERROR_STREAM("TaskSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
@@ -120,35 +120,26 @@ protected:
     return ctl_joint_setpoints;
   }
 
+  // make new velocity setpoint by integrating the original velocity & position setpoints.
+  // the original setpoints may be missing.
   double integrateSetpoints(const ros::Duration &period, const std::string &dof_name,
                             const std::map< std::string, double > &pos_setpoints,
                             const std::map< std::string, double > &vel_setpoints) {
+    // find original setpoints
     const double *const pos_sp(findValue(pos_setpoints, dof_name));
     const double *const vel_sp(findValue(vel_setpoints, dof_name));
     ct::Pid *const pid(findValue(pids_, dof_name));
 
-    if (pos_sp && vel_sp && pid) {
-      return *vel_sp + pid->computeCommand(*pos_sp /* - present_dof_pos */, period);
-    } else if (pos_sp && vel_sp && !pid) {
+    // print error if position setpoint cannot be integrated
+    if (pos_sp && !pid) {
       ROS_ERROR_STREAM(
           "TaskSpaceControllerCore::integrateSetpoints(): No pid controller found for Dof '"
           << dof_name << "'. Will ignore position setpoint in the task space.");
-      return *vel_sp;
-    } else if (pos_sp && !vel_sp && pid) {
-      return pid->computeCommand(*pos_sp /* - present_dof_pos */, period);
-    } else if (pos_sp && !vel_sp && !pid) {
-      ROS_ERROR_STREAM(
-          "TaskSpaceControllerCore::integrateSetpoints(): No pid controller found for Dof '"
-          << dof_name << "'. Will ignore position setpoint in the task space.");
-      return 0.;
-    } else if (!pos_sp && vel_sp) {
-      return *vel_sp;
-    } else if (!pos_sp && !vel_sp) {
-      return 0.;
-    } else {
-      ROS_ERROR_STREAM("TaskSpaceControllerCore::integrateSetpoints(): Bug...");
-      return 0.;
     }
+
+    // return 'vel_sp + PID(pos_sp)'
+    return (vel_sp ? *vel_sp : 0.) +
+           (pos_sp && pid ? pid->computeCommand(*pos_sp /* - present_dof_pos */, period) : 0.);
   }
 
 protected:
