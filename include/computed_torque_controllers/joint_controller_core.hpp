@@ -91,6 +91,9 @@ public:
     BOOST_FOREACH (const ControlledHardwareJointMap::value_type &joint_val, ctl_hw_joints_) {
       const ControlledHardwareJointPtr &joint(joint_val.second);
       joint->pid.reset();
+      if (joint->pos_sp_sat_handle) {
+        joint->pos_sp_sat_handle.reset();
+      }
       joint->prev_pos_sp = joint->state_handle.getPosition();
     }
   }
