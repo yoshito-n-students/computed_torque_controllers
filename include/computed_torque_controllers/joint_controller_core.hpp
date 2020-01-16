@@ -225,9 +225,9 @@ protected:
       ObservedHardwareJointPtr joint;
       const std::string ctl_joint_ns(param_nh.resolveName(ros::names::append("joints", name)));
       if (ros::param::has(ctl_joint_ns)) {
-        joint.reset(new ObservedHardwareJoint());
-      } else {
         joint.reset(new ControlledHardwareJoint());
+      } else {
+        joint.reset(new ObservedHardwareJoint());
       }
 
       // mapping to dynamics model
