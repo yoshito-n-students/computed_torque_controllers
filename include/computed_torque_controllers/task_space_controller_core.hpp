@@ -10,7 +10,9 @@
 #include <hardware_interface/robot_hw.h>
 #include <ros/console.h>
 #include <ros/duration.h>
+#include <ros/names.h>
 #include <ros/node_handle.h>
+#include <ros/param.h>
 #include <ros/time.h>
 
 #include <Eigen/Core>
@@ -57,24 +59,32 @@ public:
 
 protected:
   bool initDofs(ros::NodeHandle &param_nh) {
+    namespace rn = ros::names;
+    namespace rp = ros::param;
+
     // TODO: load the end link name & offset from params
     model_end_link_ = model_->getBodyNode(model_->getNumBodyNodes() - 1);
     end_link_offset_ = Eigen::Vector3d::Zero();
 
-    // init PIDs
-    const std::string linear_ns(param_nh.resolveName(ros::names::append("task_space", "linear")));
-    if (!pids_["linear_x"].initParam(linear_ns) || !pids_["linear_y"].initParam(linear_ns) ||
-        !pids_["linear_z"].initParam(linear_ns)) {
-      ROS_ERROR_STREAM("TaskSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
-                       << linear_ns << "'");
-      return false;
+    // load PIDs if gains are specified. this is an optional step
+    // because PIDs are not required when only velocity setpoints are given.
+    const std::string linear_ns(param_nh.resolveName(rn::append("task_space", "linear")));
+    if (rp::has(rn::append(linear_ns, "p"))) {
+      if (!pids_["linear_x"].initParam(linear_ns) || !pids_["linear_y"].initParam(linear_ns) ||
+          !pids_["linear_z"].initParam(linear_ns)) {
+        ROS_ERROR_STREAM("TaskSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
+                         << linear_ns << "'");
+        return false;
+      }
     }
-    const std::string angular_ns(param_nh.resolveName(ros::names::append("task_space", "angular")));
-    if (!pids_["angular_x"].initParam(angular_ns) || !pids_["angular_y"].initParam(angular_ns) ||
-        !pids_["angular_z"].initParam(angular_ns)) {
-      ROS_ERROR_STREAM("TaskSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
-                       << angular_ns << "'");
-      return false;
+    const std::string angular_ns(param_nh.resolveName(rn::append("task_space", "angular")));
+    if (rp::has(rn::append(linear_ns, "p"))) {
+      if (!pids_["angular_x"].initParam(angular_ns) || !pids_["angular_y"].initParam(angular_ns) ||
+          !pids_["angular_z"].initParam(angular_ns)) {
+        ROS_ERROR_STREAM("TaskSpaceControllerCore::initDofs(): Failed to init a PID by the param '"
+                         << angular_ns << "'");
+        return false;
+      }
     }
 
     return true;
