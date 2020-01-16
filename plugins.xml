@@ -4,7 +4,7 @@
          type="computed_torque_controllers::PositionJointController" 
          base_class_type="controller_interface::ControllerBase">
     <description>
-      This controller subscribes position command. 
+      This controller subscribes position command in joint space. 
       The controller expects a hardware_interface::EffortJointInterface for controlled joints
       and a hardware_interface::JointStateInterface for all other joints as a hardware interface.
     </description>
@@ -14,7 +14,17 @@
          type="computed_torque_controllers::VelocityJointController" 
          base_class_type="controller_interface::ControllerBase">
     <description>
-      This controller subscribes velocity command. 
+      This controller subscribes velocity command in joint space. 
+      The controller expects a hardware_interface::EffortJointInterface for controlled joints
+      and a hardware_interface::JointStateInterface for all other joints as a hardware interface.
+    </description>
+  </class>
+
+  <class name="computed_torque_controllers/VelocityTaskSpaceController" 
+         type="computed_torque_controllers::VelocityTaskSpaceController" 
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      This controller subscribes velocity command in task space. 
       The controller expects a hardware_interface::EffortJointInterface for controlled joints
       and a hardware_interface::JointStateInterface for all other joints as a hardware interface.
     </description>

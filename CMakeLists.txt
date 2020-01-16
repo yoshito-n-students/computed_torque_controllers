@@ -10,6 +10,7 @@ project(computed_torque_controllers)
 find_package(catkin REQUIRED COMPONENTS
   controller_interface
   control_toolbox
+  geometry_msgs
   hardware_interface
   joint_limits_interface
   pluginlib
@@ -122,6 +123,7 @@ catkin_package(
   CATKIN_DEPENDS 
     controller_interface 
     control_toolbox 
+    geometry_msgs
     hardware_interface 
     joint_limits_interface 
     pluginlib 
