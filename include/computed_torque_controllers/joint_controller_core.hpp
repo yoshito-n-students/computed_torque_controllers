@@ -92,7 +92,9 @@ public:
       const ControlledHardwareJointPtr &joint(joint_val.second);
       joint->pid.reset();
       if (joint->pos_sp_sat_handle) {
-        joint->pos_sp_sat_handle.reset();
+        // we call *Handle::reset by '->reset()' signature.
+        // '.reset()' calls boost::optional<>::reset() and destructs the handle!!
+        joint->pos_sp_sat_handle->reset();
       }
       joint->prev_pos_sp = joint->state_handle.getPosition();
     }
