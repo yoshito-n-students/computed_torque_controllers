@@ -21,7 +21,6 @@
 #include <ros/node_handle.h>
 #include <urdf/model.h>
 
-#include <dart/dynamics/FreeJoint.hpp>
 #include <dart/dynamics/Joint.hpp>
 #include <dart/dynamics/Skeleton.hpp>
 #include <dart/utils/urdf/DartLoader.hpp>
@@ -168,7 +167,7 @@ protected:
     }
 
     // root joint between root link and world, which we need to access to update the model
-    model_root_joint_ = dynamic_cast< dd::FreeJoint * >(model_->getRootJoint());
+    model_root_joint_ = model_->getRootJoint();
     if (!model_root_joint_) {
       ROS_ERROR(
           "JointControllerCore::initModel(): Faild to get a root joint of the dynamics model");
@@ -290,9 +289,8 @@ protected:
   void updateModel(const ros::Duration &period) {
     // update the root joint between the robot and world
     // (zero for now. TODO: get model state from args)
-    model_root_joint_->setTransform(Eigen::Isometry3d::Identity());
-    model_root_joint_->setLinearVelocity(Eigen::Vector3d::Zero());
-    model_root_joint_->setAngularVelocity(Eigen::Vector3d::Zero());
+    model_root_joint_->resetPositions();
+    model_root_joint_->resetVelocities();
 
     // update all joints in the robot
     BOOST_FOREACH (const ObservedHardwareJointMap::value_type &hw_joint_val, all_hw_joints_) {
@@ -351,7 +349,7 @@ protected:
 
 protected:
   dd::SkeletonPtr model_;
-  dd::FreeJoint *model_root_joint_;
+  dd::Joint *model_root_joint_;
   ObservedHardwareJointMap all_hw_joints_;
   ControlledHardwareJointMap ctl_hw_joints_;
 };
