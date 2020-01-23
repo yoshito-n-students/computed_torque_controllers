@@ -102,7 +102,8 @@ protected:
       p.tail< 3 >() = T.translation();
     }
 
-    // set reference velocity in task space
+    // set reference velocity in task space by integrating position & velocity setpoints
+    // according to 'v_r = v_sp + PID(p_sp - p)'
     Eigen::Vector6d v_r;
     v_r[0] = integrateSetpoints(period, "angular_x", vel_setpoints, pos_setpoints, p[0]);
     v_r[1] = integrateSetpoints(period, "angular_y", vel_setpoints, pos_setpoints, p[1]);
