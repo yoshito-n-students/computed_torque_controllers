@@ -45,41 +45,43 @@ public:
     controller_core_.starting();
 
     // reset velocity command
-    geometry_msgs::Twist cmd;
-    cmd.linear.x = 0.;
-    cmd.linear.y = 0.;
-    cmd.linear.z = 0.;
-    cmd.angular.x = 0.;
-    cmd.angular.y = 0.;
-    cmd.angular.z = 0.;
+    std::map< std::string, double > cmd;
+    cmd["linear_x"] = 0.;
+    cmd["linear_y"] = 0.;
+    cmd["linear_z"] = 0.;
+    cmd["angular_x"] = 0.;
+    cmd["angular_y"] = 0.;
+    cmd["angular_z"] = 0.;
     cmd_buf_.writeFromNonRT(cmd);
   }
 
   virtual void update(const ros::Time &time, const ros::Duration &period) {
-    // populate setpoints from subscribed velocity commands
-    std::map< std::string, double > setpoints;
-    const geometry_msgs::Twist cmd(*cmd_buf_.readFromRT());
-    setpoints["linear_x"] = cmd.linear.x;
-    setpoints["linear_y"] = cmd.linear.y;
-    setpoints["linear_z"] = cmd.linear.z;
-    setpoints["angular_x"] = cmd.angular.x;
-    setpoints["angular_y"] = cmd.angular.y;
-    setpoints["angular_z"] = cmd.angular.z;
-
     // update the backend
     controller_core_.update(period,
                             /* pos_setpoints = */ std::map< std::string, double >(),
-                            /* vel_setpoints = */ setpoints);
+                            /* vel_setpoints = */ *cmd_buf_.readFromRT());
   }
 
   virtual void stopping(const ros::Time &time) { controller_core_.stopping(); }
 
 private:
-  void commandCB(const geometry_msgs::TwistConstPtr &cmd) { cmd_buf_.writeFromNonRT(*cmd); }
+  void commandCB(const geometry_msgs::TwistConstPtr &msg) {
+    // convert received message to velocity command
+    std::map< std::string, double > cmd;
+    cmd["linear_x"] = msg->linear.x;
+    cmd["linear_y"] = msg->linear.y;
+    cmd["linear_z"] = msg->linear.z;
+    cmd["angular_x"] = msg->angular.x;
+    cmd["angular_y"] = msg->angular.y;
+    cmd["angular_z"] = msg->angular.z;
+
+    // remember the command to use in update()
+    cmd_buf_.writeFromNonRT(cmd);
+  }
 
 private:
   TaskSpaceControllerCore controller_core_;
-  rt::RealtimeBuffer< geometry_msgs::Twist > cmd_buf_;
+  rt::RealtimeBuffer< std::map< std::string, double > > cmd_buf_;
   ros::Subscriber cmd_sub_;
 };
 } // namespace computed_torque_controllers
