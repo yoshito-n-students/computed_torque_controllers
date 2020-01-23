@@ -57,6 +57,24 @@ public:
 
   void stopping() { JointControllerCore::stopping(); }
 
+  std::map< std::string, double > getEndEffectorPosition() const {
+    std::map< std::string, double > p;
+
+    const Eigen::Isometry3d T(model_end_link_->getWorldTransform());
+    const Eigen::Vector3d linear(T * end_link_offset_);
+    p["linear_x"] = linear[0];
+    p["linear_y"] = linear[1];
+    p["linear_z"] = linear[2];
+
+    const Eigen::AngleAxisd aa(T.linear());
+    const Eigen::Vector3d angular(aa.angle() * aa.axis());
+    p["angular_x"] = angular[0];
+    p["angular_y"] = angular[1];
+    p["angular_z"] = angular[2];
+
+    return p;
+  }
+
 protected:
   bool initDofs(ros::NodeHandle &param_nh) {
     namespace rn = ros::names;
@@ -93,24 +111,16 @@ protected:
   std::map< std::string, double > updateDofs(const ros::Duration &period,
                                              const std::map< std::string, double > &pos_setpoints,
                                              const std::map< std::string, double > &vel_setpoints) {
-    // get present position of the end effector
-    Eigen::Vector6d p;
-    {
-      const Eigen::Isometry3d T(model_end_link_->getWorldTransform());
-      const Eigen::AngleAxisd aa(T.linear());
-      p.head< 3 >() = aa.angle() * aa.axis();
-      p.tail< 3 >() = T * end_link_offset_;
-    }
-
     // set reference velocity in task space by integrating position & velocity setpoints
     // according to 'v_r = v_sp + PID(p_sp - p)'
     Eigen::Vector6d v_r;
-    v_r[0] = integrateSetpoints(period, "angular_x", vel_setpoints, pos_setpoints, p[0]);
-    v_r[1] = integrateSetpoints(period, "angular_y", vel_setpoints, pos_setpoints, p[1]);
-    v_r[2] = integrateSetpoints(period, "angular_z", vel_setpoints, pos_setpoints, p[2]);
-    v_r[3] = integrateSetpoints(period, "linear_x", vel_setpoints, pos_setpoints, p[3]);
-    v_r[4] = integrateSetpoints(period, "linear_y", vel_setpoints, pos_setpoints, p[4]);
-    v_r[5] = integrateSetpoints(period, "linear_z", vel_setpoints, pos_setpoints, p[5]);
+    const std::map< std::string, double > pos(getEndEffectorPosition());
+    v_r[0] = integrateSetpoints(period, "angular_x", vel_setpoints, pos_setpoints, pos);
+    v_r[1] = integrateSetpoints(period, "angular_y", vel_setpoints, pos_setpoints, pos);
+    v_r[2] = integrateSetpoints(period, "angular_z", vel_setpoints, pos_setpoints, pos);
+    v_r[3] = integrateSetpoints(period, "linear_x", vel_setpoints, pos_setpoints, pos);
+    v_r[4] = integrateSetpoints(period, "linear_y", vel_setpoints, pos_setpoints, pos);
+    v_r[5] = integrateSetpoints(period, "linear_z", vel_setpoints, pos_setpoints, pos);
 
     // compute Jacobian and its pseudo-inverse
     const dm::Jacobian J(model_end_link_->getWorldJacobian(end_link_offset_));
@@ -135,11 +145,12 @@ protected:
   double integrateSetpoints(const ros::Duration &period, const std::string &dof_name,
                             const std::map< std::string, double > &vel_setpoints,
                             const std::map< std::string, double > &pos_setpoints,
-                            const double pos) {
-    // find original setpoints
-    const double *const pos_sp(findValue(pos_setpoints, dof_name));
+                            const std::map< std::string, double > &positions) {
+    // find values to be integrated
     const double *const vel_sp(findValue(vel_setpoints, dof_name));
     ct::Pid *const pid(findValue(pids_, dof_name));
+    const double *const pos_sp(findValue(pos_setpoints, dof_name));
+    const double *const pos(findValue(positions, dof_name));
 
     // print error if position setpoint cannot be integrated
     if (pos_sp && !pid) {
@@ -150,7 +161,7 @@ protected:
 
     // return 'vel_sp + PID(pos_sp - pos)'
     return (vel_sp ? *vel_sp : 0.) +
-           (pos_sp && pid ? pid->computeCommand(*pos_sp - pos, period) : 0.);
+           (pid && pos_sp && pos ? pid->computeCommand(*pos_sp - *pos, period) : 0.);
   }
 
 protected:

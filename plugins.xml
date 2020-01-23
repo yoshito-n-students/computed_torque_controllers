@@ -10,6 +10,16 @@
     </description>
   </class>
 
+  <class name="computed_torque_controllers/PositionTaskSpaceController" 
+         type="computed_torque_controllers::PositionTaskSpaceController" 
+         base_class_type="controller_interface::ControllerBase">
+    <description>
+      This controller subscribes position command in task space. 
+      The controller expects a hardware_interface::EffortJointInterface for controlled joints
+      and a hardware_interface::JointStateInterface for all other joints as a hardware interface.
+    </description>
+  </class>
+
   <class name="computed_torque_controllers/VelocityJointController" 
          type="computed_torque_controllers::VelocityJointController" 
          base_class_type="controller_interface::ControllerBase">
