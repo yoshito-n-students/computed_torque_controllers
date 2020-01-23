@@ -16,6 +16,8 @@
 #include <ros/subscriber.h>
 #include <ros/time.h>
 
+#include <Eigen/Core>
+
 namespace computed_torque_controllers {
 
 // controller frontend subscribing task space position commands & passing them to backend
