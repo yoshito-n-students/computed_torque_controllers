@@ -2,6 +2,11 @@
 Changelog for package computed_torque_controllers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.0.4 (2020-01-23)
+------------------
+* Added VelocityTaskSpaceController
+* Refactored joint controllers
+
 0.0.3 (2020-01-09)
 ------------------
 * Changed package names (computed_torque_controller -> controllers)
