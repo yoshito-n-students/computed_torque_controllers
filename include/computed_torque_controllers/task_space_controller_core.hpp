@@ -99,7 +99,7 @@ protected:
       const Eigen::Isometry3d T(model_end_link_->getWorldTransform());
       const Eigen::AngleAxisd aa(T.linear());
       p.head< 3 >() = aa.angle() * aa.axis();
-      p.tail< 3 >() = T.translation();
+      p.tail< 3 >() = T * end_link_offset_;
     }
 
     // set reference velocity in task space by integrating position & velocity setpoints
