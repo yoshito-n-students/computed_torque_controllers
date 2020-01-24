@@ -219,7 +219,7 @@ protected:
     const Eigen::MatrixXd pinv_J(
         J.transpose() * (J * J.transpose() + 0.0025 * Eigen::Matrix6d::Identity()).inverse());
 
-    // convert reference velocity from task to joint spaces
+    // convert velocity command from task to joint spaces
     std::map< std::string, double > ctl_joint_setpoints;
     BOOST_FOREACH (const ControlledHardwareJointMap::value_type &joint_val, ctl_hw_joints_) {
       const std::string &name(joint_val.first);
