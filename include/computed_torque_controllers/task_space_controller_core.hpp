@@ -139,7 +139,8 @@ protected:
     // load joint limits for each DoF if given
     ros::NodeHandle limits_nh(param_nh.getNamespace(),
                               /* remappings = */ ba::map_list_of< std::string, std::string >(
-                                  "joint_limits", "task_space"));
+                                  "joint_limits/linear", "task_space/linear")(
+                                  "joint_limits/angular", "task_space/angular"));
     // try loading limits from 'task_space/linear', which is an alias of 'joint_limits/linear'
     jli::JointLimits linear_limits;
     if (jli::getJointLimits("linear", limits_nh, linear_limits)) {
@@ -233,8 +234,8 @@ protected:
 
   void updateDofStates() {
     // references to DoFs
-    Dof &linear_x_dof(*findValue(dofs_, std::string("linear_x"))), &linear_y_dof(*findValue(dofs_, "linear_y")),
-        &linear_z_dof(*findValue(dofs_, "linear_z")),
+    Dof &linear_x_dof(*findValue(dofs_, std::string("linear_x"))),
+        &linear_y_dof(*findValue(dofs_, "linear_y")), &linear_z_dof(*findValue(dofs_, "linear_z")),
         &angular_x_dof(*findValue(dofs_, "angular_x")),
         &angular_y_dof(*findValue(dofs_, "angular_y")),
         &angular_z_dof(*findValue(dofs_, "angular_z"));
