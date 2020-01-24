@@ -336,14 +336,15 @@ protected:
   // ================================================================================
   // utility functions to find a value corresponding the given key in the given map.
   // returns the pointer of value if found, or NULL.
-  template < typename Key, typename Value >
-  static Value *findValue(std::map< Key, Value > &val_map, const Key &key) {
-    const typename std::map< Key, Value >::iterator it(val_map.find(key));
+  template < typename Value >
+  static Value *findValue(std::map< std::string, Value > &val_map, const std::string &key) {
+    const typename std::map< std::string, Value >::iterator it(val_map.find(key));
     return it != val_map.end() ? &it->second : NULL;
   }
-  template < typename Key, typename Value >
-  static const Value *findValue(const std::map< Key, Value > &val_map, const Key &key) {
-    const typename std::map< Key, Value >::const_iterator it(val_map.find(key));
+  template < typename Value >
+  static const Value *findValue(const std::map< std::string, Value > &val_map,
+                                const std::string &key) {
+    const typename std::map< std::string, Value >::const_iterator it(val_map.find(key));
     return it != val_map.end() ? &it->second : NULL;
   }
 
