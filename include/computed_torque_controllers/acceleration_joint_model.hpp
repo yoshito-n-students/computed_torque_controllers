@@ -7,6 +7,7 @@
 
 #include <computed_torque_controllers/common_namespaces.hpp>
 #include <computed_torque_controllers/ros_package_resource_retriever.hpp>
+#include <ros/assert.h>
 #include <ros/console.h>
 #include <ros/duration.h>
 #include <ros/node_handle.h>
@@ -22,19 +23,18 @@
 
 namespace computed_torque_controllers {
 
-// ===========================================================================================
-// core control implementation without command subscription
-//   [ input] position and velocity setpoints of each controlled joint & states of all joints
-//   [output] effort commands to controlled joints
+// =======================================================
+// dynamics model which calculates required joint efforts
+// on the basis of desired joint accelerations
 class AccelerationJointModel {
 public:
   AccelerationJointModel() {}
 
   virtual ~AccelerationJointModel() {}
 
-  // =======================================================
+  // ========================================================
   // name-based interface for ros-controller implementations
-  // =======================================================
+  // ========================================================
 
   // ==========================================
   bool init(const ros::NodeHandle &param_nh) {
@@ -48,6 +48,11 @@ public:
                 "robot description");
       return false;
     }
+
+    // make sure the root joint between the world and model is fixed
+    // & all other joints are fixed or single-DoF.
+    // this ensures all DoFs in the model belong to different joints
+    // so that we can convert DoF indices & joint names.
     if (model_->getRootJoint()->getNumDofs() > 0) {
       ROS_ERROR("AccelerationJointModel::init(): Non-fixed root joint");
       return false;
@@ -78,12 +83,12 @@ public:
   }
 
 protected:
-  // =====================================================
+  // ======================================================
   // index-based interface for child model implementations
-  // =====================================================
+  // ======================================================
 
   void update(const Eigen::VectorXd &q, const Eigen::VectorXd &dq, const ros::Duration &dt) {
-    // update all DoFs in the robot
+    // update all actuated joints in the model
     for (std::size_t i = 0; i < model_->getNumDofs(); ++i) {
       // use joint state forwarded by one time step for better control stability
       // (recommended in https://dartsim.github.io/tutorials_manipulator.html)
@@ -97,14 +102,18 @@ protected:
     return eigenToJointMap(model_->getMassMatrix() * u + model_->getCoriolisAndGravityForces());
   }
 
-  // ===============================
+  // ================================
   // conversion between name & index
-  // ===============================
+  // ================================
+
+  const std::string &jointIdToName(const std::size_t id) const {
+    return model_->getDof(id)->getJoint()->getName();
+  }
 
   Eigen::VectorXd jointMapToEigen(const std::map< std::string, double > &m) const {
     Eigen::VectorXd e(model_->getNumDofs());
     for (std::size_t i = 0; i < model_->getNumDofs(); ++i) {
-      e[i] = findValue(m, model_->getDof(i)->getJoint()->getName());
+      e[i] = findValue(m, jointIdToName(i));
     }
     return e;
   }
@@ -112,10 +121,10 @@ protected:
   std::map< std::string, double > eigenToJointMap(const Eigen::VectorXd &e) const {
     ROS_ASSERT_MSG(e.size() == model_->getNumDofs(),
                    "AccelerationJointMap::eigenToJointMap(): Invalid vector size");
-                   
+
     std::map< std::string, double > m;
     for (std::size_t i = 0; i < model_->getNumDofs(); ++i) {
-      m[model_->getDof(i)->getJoint()->getName()] = e[i];
+      m[jointIdToName(i)] = e[i];
     }
     return m;
   }
