@@ -5,8 +5,10 @@
 #include <string>
 
 #include <computed_torque_controllers/common_namespaces.hpp>
-#include <computed_torque_controllers/joint_controller_core.hpp>
-#include <controller_interface/multi_interface_controller.h>
+#include <computed_torque_controllers/effort_joint_hardware.hpp>
+#include <computed_torque_controllers/velocity_joint_model.hpp>
+#include <controller_interface/controller.h>
+#include <hardware_interface/joint_command_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <realtime_tools/realtime_buffer.h>
 #include <ros/console.h>
@@ -24,19 +26,18 @@
 namespace computed_torque_controllers {
 
 // controller frontend subscribing joint velocity commands & passing them to backend
-class VelocityJointController
-    : public ci::MultiInterfaceController< hi::JointStateInterface, hi::EffortJointInterface > {
+class VelocityJointController : public ci::Controller< hi::EffortJointInterface > {
 private:
-  struct ControlledJointInfo {
+  struct RealtimeSubscriber {
     // in kinetic, rt::RealtimeBuffer<> does not have a const copy constructor
-    //   --> ControlledJointInfo cannot have a const copy constructor
-    //   --> BOOST_FOREACH(ControlledJointInfoMap::value_type &v, ctl_joints) does not compile
+    //   --> RealtimeSubscriber cannot have a const copy constructor
+    //   --> BOOST_FOREACH(RealtimeSubscriberMap::value_type &v, subscribers_) does not compile
     // boost::optional<> is workaround to enable a const copy constructor.
-    // actually, cmd_buf is always available.
-    boost::optional< rt::RealtimeBuffer< double > > cmd_buf;
-    ros::Subscriber cmd_sub;
+    // actually, buf is always available.
+    boost::optional< rt::RealtimeBuffer< double > > buf;
+    ros::Subscriber sub;
   };
-  typedef std::map< std::string, ControlledJointInfo > ControlledJointInfoMap;
+  typedef std::map< std::string, RealtimeSubscriber > RealtimeSubscriberMap;
 
 public:
   VelocityJointController() {}
@@ -47,50 +48,59 @@ public:
 
   virtual bool init(hi::RobotHW *hw, ros::NodeHandle &root_nh, ros::NodeHandle &controller_nh) {
     // init the controller backend
-    if (!controller_core_.init(hw, controller_nh)) {
-      ROS_ERROR("VelocityJointController::init(): Failed to init the controller backend");
+    if (!eff_jnt_hw_.init(hw, controller_nh)) {
+      ROS_ERROR("VelocityJointController::init(): Failed to init the joint hardware");
+      return false;
+    }
+    if (!vel_jnt_model_.init(controller_nh)) {
+      ROS_ERROR("VelocityJointController::init(): Failed to init the joint model");
       return false;
     }
 
     // subscribe commands for controlled joints
-    BOOST_FOREACH (const std::string &name, controller_core_.getControlledJointNames()) {
-      ControlledJointInfo &info(ctl_joints_[name]);
-      info.cmd_buf.emplace();
-      info.cmd_sub = controller_nh.subscribe< std_msgs::Float64 >(
+    BOOST_FOREACH (const std::string &name, eff_jnt_hw_.getJointNames()) {
+      RealtimeSubscriber &sub(subscribers_[name]);
+      sub.buf.emplace();
+      sub.sub = controller_nh.subscribe< std_msgs::Float64 >(
           ros::names::append(name, "command"), 1,
-          boost::bind(&VelocityJointController::commandCB, _1, info.cmd_buf.get_ptr()));
+          boost::bind(&VelocityJointController::commandCB, _1, sub.buf.get_ptr()));
     }
 
     return true;
   }
 
   virtual void starting(const ros::Time &time) {
-    controller_core_.starting();
+    vel_jnt_model_.reset();
 
-    BOOST_FOREACH (ControlledJointInfoMap::value_type &joint_val, ctl_joints_) {
-      ControlledJointInfo &info(joint_val.second);
+    BOOST_FOREACH (RealtimeSubscriberMap::value_type &sub_val, subscribers_) {
+      RealtimeSubscriber &sub(sub_val.second);
       // reset velocity command
-      info.cmd_buf->writeFromNonRT(0.);
+      sub.buf->writeFromNonRT(0.);
     }
   }
 
   virtual void update(const ros::Time &time, const ros::Duration &period) {
+    //
+    vel_jnt_model_.update(eff_jnt_hw_.getPositions(), eff_jnt_hw_.getVelocities(), period);
+
     // populate setpoints from subscribed velocity commands
-    std::map< std::string, double > setpoints;
-    BOOST_FOREACH (ControlledJointInfoMap::value_type &joint_val, ctl_joints_) {
-      const std::string &name(joint_val.first);
-      ControlledJointInfo &info(joint_val.second);
+    std::map< std::string, double > vel_setpoints;
+    BOOST_FOREACH (RealtimeSubscriberMap::value_type &sub_val, subscribers_) {
+      const std::string &name(sub_val.first);
+      RealtimeSubscriber &sub(sub_val.second);
       // copy velocity setpoint from the buffer
-      setpoints[name] = *info.cmd_buf->readFromRT();
+      vel_setpoints[name] = *sub.buf->readFromRT();
     }
 
     // update the backend
-    controller_core_.update(period,
-                            /* pos_setpoints = */ std::map< std::string, double >(),
-                            /* vel_setpoints = */ setpoints);
+    const std::map< std::string, double > eff_commands(
+        vel_jnt_model_.computeEffortCommands(vel_setpoints, period));
+
+    //
+    eff_jnt_hw_.setCommands(eff_commands);
   }
 
-  virtual void stopping(const ros::Time &time) { controller_core_.stopping(); }
+  virtual void stopping(const ros::Time &time) {}
 
 private:
   static void commandCB(const std_msgs::Float64ConstPtr &msg,
@@ -99,8 +109,9 @@ private:
   }
 
 private:
-  JointControllerCore controller_core_;
-  ControlledJointInfoMap ctl_joints_;
+  EffortJointHardware eff_jnt_hw_;
+  VelocityJointModel vel_jnt_model_;
+  RealtimeSubscriberMap subscribers_;
 };
 } // namespace computed_torque_controllers
 

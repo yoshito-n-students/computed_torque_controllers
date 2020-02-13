@@ -5,8 +5,9 @@
 #include <string>
 
 #include <computed_torque_controllers/common_namespaces.hpp>
-#include <computed_torque_controllers/task_space_controller_core.hpp>
-#include <controller_interface/multi_interface_controller.h>
+#include <computed_torque_controllers/effort_joint_hardware.hpp>
+#include <computed_torque_controllers/position_task_space_model.hpp>
+#include <controller_interface/controller.h>
 #include <geometry_msgs/Pose.h>
 #include <hardware_interface/robot_hw.h>
 #include <realtime_tools/realtime_buffer.h>
@@ -21,8 +22,7 @@
 namespace computed_torque_controllers {
 
 // controller frontend subscribing task space position commands & passing them to backend
-class PositionTaskSpaceController
-    : public ci::MultiInterfaceController< hi::JointStateInterface, hi::EffortJointInterface > {
+class PositionTaskSpaceController : public ci::Controller< hi::EffortJointInterface > {
 public:
   PositionTaskSpaceController() {}
 
@@ -32,7 +32,11 @@ public:
 
   virtual bool init(hi::RobotHW *hw, ros::NodeHandle &root_nh, ros::NodeHandle &controller_nh) {
     // init the controller backend
-    if (!controller_core_.init(hw, controller_nh)) {
+    if (!eff_jnt_hw_.init(hw, controller_nh)) {
+      ROS_ERROR("PositionTaskSpaceController::init(): Failed to init the joint hardware");
+      return false;
+    }
+    if (!pos_ts_model_.init(controller_nh)) {
       ROS_ERROR("PositionTaskSpaceController::init(): Failed to init the controller backend");
       return false;
     }
@@ -44,20 +48,26 @@ public:
   }
 
   virtual void starting(const ros::Time &time) {
-    controller_core_.starting();
+    pos_ts_model_.reset();
 
     // reset position command by present position
-    cmd_buf_.writeFromNonRT(controller_core_.getEndEffectorPosition());
+    pos_ts_model_.update(eff_jnt_hw_.getPositions(), eff_jnt_hw_.getVelocities(), ros::Duration(0));
+    cmd_buf_.writeFromNonRT(pos_ts_model_.getPositions());
   }
 
   virtual void update(const ros::Time &time, const ros::Duration &period) {
-    // update the backend
-    controller_core_.update(period,
-                            /* pos_setpoints = */ *cmd_buf_.readFromRT(),
-                            /* vel_setpoints = */ std::map< std::string, double >());
+    // get current hardware joint states
+    pos_ts_model_.update(eff_jnt_hw_.getPositions(), eff_jnt_hw_.getVelocities(), period);
+
+    // compute effort commands based on states & setpoints
+    const std::map< std::string, double > eff_commands(
+        pos_ts_model_.computeEffortCommands(*cmd_buf_.readFromRT(), period));
+
+    // set effort commands to the hardware
+    eff_jnt_hw_.setCommands(eff_commands);
   }
 
-  virtual void stopping(const ros::Time &time) { controller_core_.stopping(); }
+  virtual void stopping(const ros::Time &time) {}
 
 private:
   void commandCB(const geometry_msgs::PoseConstPtr &msg) {
@@ -78,7 +88,8 @@ private:
   }
 
 private:
-  TaskSpaceControllerCore controller_core_;
+  EffortJointHardware eff_jnt_hw_;
+  PositionTaskSpaceModel pos_ts_model_;
   rt::RealtimeBuffer< std::map< std::string, double > > cmd_buf_;
   ros::Subscriber cmd_sub_;
 };
