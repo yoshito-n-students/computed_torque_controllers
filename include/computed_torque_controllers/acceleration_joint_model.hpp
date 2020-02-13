@@ -7,6 +7,7 @@
 
 #include <computed_torque_controllers/common_namespaces.hpp>
 #include <computed_torque_controllers/ros_package_resource_retriever.hpp>
+#include <computed_torque_controllers/utils.hpp>
 #include <ros/assert.h>
 #include <ros/console.h>
 #include <ros/duration.h>
