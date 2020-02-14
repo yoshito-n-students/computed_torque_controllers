@@ -6,38 +6,42 @@
 
 #include <computed_torque_controllers/common_namespaces.hpp>
 #include <computed_torque_controllers/position_task_space_model.hpp>
-#include <ros/console.h>
 #include <ros/duration.h>
 #include <ros/node_handle.h>
 
-#include <boost/foreach.hpp>
 #include <boost/math/special_functions/fpclassify.hpp> // for boost::math::isnan()
 
 namespace computed_torque_controllers {
 
-// ===========================================================================================
-// core control implementation without command subscription
-//   [ input] position and velocity setpoints of each controlled joint & states of all joints
-//   [output] effort commands to controlled joints
+// =======================================================
+// dynamics model which calculates required joint efforts
+// on the basis of desired end-effector velocity
 class VelocityTaskSpaceModel : protected PositionTaskSpaceModel {
 public:
   VelocityTaskSpaceModel() {}
 
   virtual ~VelocityTaskSpaceModel() {}
 
+  // ========================================================
+  // name-based interface for ros-controller implementations
+  // ========================================================
+
   // ==========================================
   bool init(const ros::NodeHandle &param_nh) { return PositionTaskSpaceModel::init(param_nh); }
 
-  // ============
+  // ===============================================
+  // reset the model states (not destroy the model)
   void reset() { PositionTaskSpaceModel::reset(); }
 
-  // ===================================================================
+  // ===============================================================
+  // update model state based on given joint positions & velocities
   void update(const std::map< std::string, double > &jnt_positions,
               const std::map< std::string, double > &jnt_velocities, const ros::Duration &dt) {
     update(jointMapToEigen(jnt_positions), jointMapToEigen(jnt_velocities), dt);
   }
 
-  // ========================================================================
+  // =============================================================================================
+  // compute joint effort commands to realize given end-effector vel setpoints based on the model
   std::map< std::string, double >
   computeEffortCommands(const std::map< std::string, double > &vel_setpoints,
                         const ros::Duration &dt) {
@@ -45,6 +49,10 @@ public:
   }
 
 protected:
+  // ======================================================
+  // index-based interface for child model implementations
+  // ======================================================
+
   void update(const Eigen::VectorXd &q, const Eigen::VectorXd &dq, const ros::Duration &dt) {
     PositionTaskSpaceModel::update(q, dq, dt);
   }
