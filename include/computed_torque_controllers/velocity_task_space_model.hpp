@@ -45,7 +45,7 @@ public:
   std::map< std::string, double >
   computeEffortCommands(const std::map< std::string, double > &vel_setpoints,
                         const ros::Duration &dt) {
-    computeEffortCommands(dofMapToEigen(vel_setpoints), dt);
+    return computeEffortCommands(dofMapToEigen(vel_setpoints), dt);
   }
 
 protected:

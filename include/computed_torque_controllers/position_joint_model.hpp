@@ -117,7 +117,7 @@ public:
   std::map< std::string, double >
   computeEffortCommands(const std::map< std::string, double > &pos_setpoints,
                         const ros::Duration &dt) {
-    computeEffortCommands(jointMapToEigen(pos_setpoints), dt);
+    return computeEffortCommands(jointMapToEigen(pos_setpoints), dt);
   }
 
 protected:
