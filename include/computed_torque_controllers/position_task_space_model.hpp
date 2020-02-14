@@ -1,6 +1,7 @@
 #ifndef COMPUTED_TORQUE_CONTROLLERS_POSITION_TASK_SPACE_MODEL_HPP
 #define COMPUTED_TORQUE_CONTROLLERS_POSITION_TASK_SPACE_MODEL_HPP
 
+#include <limits>
 #include <map>
 #include <string>
 
@@ -21,6 +22,9 @@
 
 namespace computed_torque_controllers {
 
+// =======================================================
+// dynamics model which calculates required joint efforts
+// on the basis of desired end-effector position
 class PositionTaskSpaceModel : protected AccelerationTaskSpaceModel {
 private:
   struct DofInfo {
@@ -35,6 +39,10 @@ public:
   PositionTaskSpaceModel() {}
 
   virtual ~PositionTaskSpaceModel() {}
+
+  // ========================================================
+  // name-based interface for ros-controller implementations
+  // ========================================================
 
   // ==========================================
   bool init(const ros::NodeHandle &param_nh) {
@@ -86,6 +94,8 @@ public:
     return true;
   }
 
+  // ===============================================
+  // reset the model states (not destroy the model)
   void reset() {
     BOOST_FOREACH (DofInfo &dof, dof_infos_) {
       dof.pos_sp = std::numeric_limits< double >::quiet_NaN();
@@ -96,19 +106,27 @@ public:
     }
   }
 
+  // ===========================================
+  // returns end-effector position of the model
   std::map< std::string, double > getPositions() const {
     return eigenToDofMap(getPositionsEigen());
   }
 
+  // ======================================================
+  // returns end-effector positions setpoints of the model
   std::map< std::string, double > getSetpoints() const {
     return eigenToDofMap(getSetpointsEigen());
   }
 
+  // ===============================================================
+  // update model state based on given joint positions & velocities
   void update(const std::map< std::string, double > &jnt_positions,
               const std::map< std::string, double > &jnt_velocities, const ros::Duration &dt) {
     update(jointMapToEigen(jnt_positions), jointMapToEigen(jnt_velocities), dt);
   }
 
+  // =============================================================================================
+  // compute joint effort commands to realize given end-effector pos setpoints based on the model
   std::map< std::string, double >
   computeEffortCommands(const std::map< std::string, double > &pos_setpoints,
                         const ros::Duration &dt) {
@@ -116,6 +134,10 @@ public:
   }
 
 protected:
+  // ======================================================
+  // index-based interface for child model implementations
+  // ======================================================
+
   Eigen::Vector6d getPositionsEigen() const {
     Eigen::Vector6d x;
     for (std::size_t i = 0; i < 6; ++i) {
