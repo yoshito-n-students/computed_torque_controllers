@@ -54,18 +54,21 @@ public:
       return false;
     }
 
-    // load PIDs if gains are specified. this is an optional step
-    // because PIDs are not required unless position setpoints are given.
-    const std::string angular_ns(param_nh.resolveName(rn::append("task_space", "angular")));
-    if (!initDofPid(&dof_infos_[0], angular_ns) || !initDofPid(&dof_infos_[1], angular_ns) ||
-        !initDofPid(&dof_infos_[2], angular_ns)) {
+    // load PID controllers from param for angular control.
+    // if the first DoF is successfully initialized, then other two just copy gains from the first.
+    const ros::NodeHandle angular_nh(param_nh, rn::append("task_space", "angular"));
+    if (!initDofPid(&dof_infos_[0], angular_nh)) {
       return false;
     }
-    const std::string linear_ns(param_nh.resolveName(rn::append("task_space", "linear")));
-    if (!initDofPid(&dof_infos_[3], linear_ns) || !initDofPid(&dof_infos_[4], linear_ns) ||
-        !initDofPid(&dof_infos_[5], linear_ns)) {
+    dof_infos_[1].pid = dof_infos_[0].pid;
+    dof_infos_[2].pid = dof_infos_[0].pid;
+    // load PID controllers from param for linear control
+    const ros::NodeHandle linear_nh(param_nh, rn::append("task_space", "linear"));
+    if (!initDofPid(&dof_infos_[3], linear_nh)) {
       return false;
     }
+    dof_infos_[4].pid = dof_infos_[3].pid;
+    dof_infos_[5].pid = dof_infos_[3].pid;
 
     // load joint limits for each DoF if given
     ros::NodeHandle limits_nh(param_nh.getNamespace(),
@@ -219,10 +222,11 @@ protected:
   }
 
 private:
-  static bool initDofPid(DofInfo *const dof, const std::string &dof_ns) {
-    if (!dof->pid.initParam(dof_ns)) {
-      ROS_ERROR_STREAM("PositionTaskSpaceModel::initDofPid(): Failed to init a PID by the param '"
-                       << dof_ns << "'");
+  static bool initDofPid(DofInfo *const dof, const ros::NodeHandle &pid_nh) {
+    if (!dof->pid.init(pid_nh)) {
+      ROS_ERROR_STREAM(
+          "PositionTaskSpaceModel::initDofPid(): Failed to init a PID by the param namespace '"
+          << pid_nh.getNamespace() << "'");
       return false;
     }
     return true;
