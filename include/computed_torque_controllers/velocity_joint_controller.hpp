@@ -9,7 +9,6 @@
 #include <computed_torque_controllers/velocity_joint_model.hpp>
 #include <controller_interface/controller.h>
 #include <hardware_interface/joint_command_interface.h>
-#include <hardware_interface/robot_hw.h>
 #include <realtime_tools/realtime_buffer.h>
 #include <ros/console.h>
 #include <ros/duration.h>
@@ -46,7 +45,7 @@ public:
 
   // required interfaces as a Controller
 
-  virtual bool init(hi::RobotHW *hw, ros::NodeHandle &root_nh, ros::NodeHandle &controller_nh) {
+  virtual bool init(hi::EffortJointInterface *hw, ros::NodeHandle &controller_nh) {
     // init the controller backend
     if (!eff_jnt_hw_.init(hw, controller_nh)) {
       ROS_ERROR("VelocityJointController::init(): Failed to init the joint hardware");

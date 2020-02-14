@@ -8,7 +8,6 @@
 #include <computed_torque_controllers/utils.hpp>
 #include <hardware_interface/hardware_interface.h> // for hi::HardwareInterfaceException
 #include <hardware_interface/joint_command_interface.h>
-#include <hardware_interface/robot_hw.h>
 #include <ros/console.h>
 #include <ros/node_handle.h>
 #include <urdf/model.h>
@@ -23,16 +22,10 @@ public:
 
   virtual ~EffortJointHardware() {}
 
-  bool init(hi::RobotHW *const hw, const ros::NodeHandle &param_nh) {
+  bool init(hi::EffortJointInterface *const eff_cmd_iface, const ros::NodeHandle &param_nh) {
     urdf::Model robot_desc;
     if (!robot_desc.initString(getRobotDescription(param_nh))) {
       ROS_ERROR("EffortJointHardware::init(): Failed to parse robot description as an URDF");
-      return false;
-    }
-
-    hi::EffortJointInterface *const eff_cmd_iface(hw->get< hi::EffortJointInterface >());
-    if (!eff_cmd_iface) {
-      ROS_ERROR("EffortJointHardware::init(): No effort joint interface in the hardware");
       return false;
     }
 
