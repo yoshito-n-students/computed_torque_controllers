@@ -6,33 +6,28 @@
 
 #include <computed_torque_controllers/acceleration_joint_model.hpp>
 #include <computed_torque_controllers/common_namespaces.hpp>
-#include <control_toolbox/pid.h>
-#include <hardware_interface/joint_state_interface.h>
-#include <joint_limits_interface/joint_limits.h>
-#include <joint_limits_interface/joint_limits_interface.h>
-#include <joint_limits_interface/joint_limits_urdf.h>
 #include <ros/console.h>
 #include <ros/duration.h>
-#include <ros/names.h>
 #include <ros/node_handle.h>
-#include <urdf/model.h>
 
-#include <dart/dynamics/Joint.hpp>
+#include <dart/dynamics/BodyNode.hpp>
 
-#include <boost/foreach.hpp>
-#include <boost/optional.hpp>
+#include <Eigen/Core>
 
 namespace computed_torque_controllers {
 
-// ===========================================================================================
-// core control implementation without command subscription
-//   [ input] position and velocity setpoints of each controlled joint & states of all joints
-//   [output] effort commands to controlled joints
+// =======================================================
+// dynamics model which calculates required joint efforts
+// on the basis of desired end-effector acceleration
 class AccelerationTaskSpaceModel : protected AccelerationJointModel {
 public:
   AccelerationTaskSpaceModel() {}
 
   virtual ~AccelerationTaskSpaceModel() {}
+
+  // ========================================================
+  // name-based interface for ros-controller implementations
+  // ========================================================
 
   // ==========================================
   bool init(const ros::NodeHandle &param_nh) {
@@ -48,19 +43,25 @@ public:
     return true;
   }
 
-  // =====================================================================
+  // ===============================================================
+  // update model state based on given joint positions & velocities
   void update(const std::map< std::string, double > &jnt_positions,
               const std::map< std::string, double > &jnt_velocities, const ros::Duration &dt) {
     update(jointMapToEigen(jnt_positions), jointMapToEigen(jnt_velocities), dt);
   }
 
-  // ========================================================================
+  // =============================================================================================
+  // compute joint effort commands to realize given end-effector acc setpoints based on the model
   std::map< std::string, double >
   computeEffortCommands(const std::map< std::string, double > &acc_setpoints) const {
     return computeEffortCommands(dofMapToEigen(acc_setpoints));
   }
 
 protected:
+  // ======================================================
+  // index-based interface for child model implementations
+  // ======================================================
+
   void update(const Eigen::VectorXd &q, const Eigen::VectorXd &dq, const ros::Duration &dt) {
     AccelerationJointModel::update(q, dq, dt);
   }
@@ -78,25 +79,43 @@ protected:
     return AccelerationJointModel::computeEffortCommands(uq);
   }
 
+  // ================================
+  // conversion between name & index
+  // ================================
+
+  static std::string dofIdToName(const std::size_t id) {
+    ROS_ASSERT_MSG(id >= 0 && id < 6, "AccelerationTaskSpaceModel::dofIdToName(): Invalid id (%d)",
+                   static_cast< int >(id));
+
+    switch (id) {
+    case 0:
+      return "angular_x";
+    case 1:
+      return "angular_y";
+    case 2:
+      return "angular_z";
+    case 3:
+      return "linear_x";
+    case 4:
+      return "linear_y";
+    case 5:
+      return "linear_z";
+    }
+  }
+
   static Eigen::Vector6d dofMapToEigen(const std::map< std::string, double > &m) {
     Eigen::Vector6d e;
-    e[0] = findValue(m, "angular_x");
-    e[1] = findValue(m, "angular_y");
-    e[2] = findValue(m, "angular_z");
-    e[3] = findValue(m, "linear_x");
-    e[4] = findValue(m, "linear_y");
-    e[5] = findValue(m, "linear_z");
+    for (std::size_t i = 0; i < 6; ++i) {
+      e[i] = findValue(m, dofIdToName(i));
+    }
     return e;
   }
 
   static std::map< std::string, double > eigenToDofMap(const Eigen::Vector6d &e) {
     std::map< std::string, double > m;
-    m["angular_x"] = e[0];
-    m["angular_y"] = e[1];
-    m["angular_z"] = e[2];
-    m["linear_x"] = e[3];
-    m["linear_y"] = e[4];
-    m["linear_z"] = e[5];
+    for (std::size_t i = 0; i < 6; ++i) {
+      m[dofIdToName(i)] = e[i];
+    }
     return m;
   }
 
