@@ -214,8 +214,7 @@ protected:
     // acc setpoints based on position errors
     Eigen::Vector6d ux;
     for (std::size_t i = 0; i < 6; ++i) {
-      DofInfo &dof(dof_infos_[i]);
-      ux[i] = dof.pid.computeCommand(ex[i], dt);
+      ux[i] = dof_infos_[i].pid.computeCommand(ex[i], dt);
     }
 
     return AccelerationTaskSpaceModel::computeEffortCommands(ux);
